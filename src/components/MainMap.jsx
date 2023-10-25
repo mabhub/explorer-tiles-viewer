@@ -18,7 +18,7 @@ const initialViewState = { longitude: 1.4, latitude: 43.6, zoom: 11 };
 const mapStyle = { width: '100%', minHeight: 100, height: '100%' };
 const interactiveLayerIds = ['tiles'];
 
-const MainMap = () => {
+const MainMap = ({ routes = [] }) => {
   const mapRef = React.useRef();
   const [gridBefore, setGridBefore] = React.useState();
   const [activeTile, setActiveTile] = React.useState();
@@ -147,7 +147,7 @@ const MainMap = () => {
       interactiveLayerIds={interactiveLayerIds}
       onClick={handleMapClick}
     >
-      <MapContent gridBefore={gridBefore} />
+      <MapContent gridBefore={gridBefore} routes={routes} />
       {activeTile && (
         <Popup
           latitude={tile2lat(activeTile.id.split('/').at(2), 14)}
