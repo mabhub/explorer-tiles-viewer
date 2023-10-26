@@ -163,6 +163,9 @@ const MainMap = ({ routes = [] }) => {
       mapStyle={import.meta.env.VITE_DEFAULT_MAPSTYLE}
       onLoad={handleMapLoad}
       onMoveEnd={renderTiles}
+      onMove={renderTiles}
+      onZoomEnd={renderTiles}
+      onZoom={renderTiles}
       ref={mapRef}
       interactiveLayerIds={interactiveLayerIds}
       onClick={handleMapClick}
