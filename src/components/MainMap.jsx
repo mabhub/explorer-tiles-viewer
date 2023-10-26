@@ -7,10 +7,13 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import MapLibreGL from 'maplibre-gl';
 import { Popup } from 'react-map-gl';
 import { useLocation } from 'react-router-dom';
+import createPersistedState from 'use-persisted-state/src';
 
 import useActivities from '../hooks/use-activities';
 import MapContent from './MapContent';
 import { tile2lat, tile2long } from '../lib';
+
+const useSharesState = createPersistedState('shares');
 
 const protocol = new pmtiles.Protocol();
 MapLibreGL.addProtocol('pmtiles', protocol.tile);
@@ -22,9 +25,11 @@ const MainMap = ({ routes = [] }) => {
   const mapRef = React.useRef();
   const [gridBefore, setGridBefore] = React.useState();
   const [activeTile, setActiveTile] = React.useState();
+  const [shares] = useSharesState({});
 
   const location = useLocation();
-  const hashContent = location.hash.substring(1);
+  const hashContent = location.hash.substring(1)
+    || Object.entries(shares).map(([id]) => id).join(',');
 
   const allActivitiesQueries = useActivities(hashContent);
 
@@ -36,9 +41,11 @@ const MainMap = ({ routes = [] }) => {
 
       const store = [];
 
-      allActivitiesQueries.forEach(({ data = [], status }) => {
+      allActivitiesQueries.forEach(({ data: [id, data] = [], status }) => {
         if (status === 'success') {
-          store.push(data.at(1));
+          if (shares[id].disabled !== true) {
+            store.push(data);
+          }
         }
       });
 
@@ -50,7 +57,7 @@ const MainMap = ({ routes = [] }) => {
 
       return flat;
     },
-    [allActivitiesQueries],
+    [allActivitiesQueries, shares],
   );
 
   const allTiles = React.useMemo(
