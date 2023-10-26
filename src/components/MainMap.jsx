@@ -63,13 +63,12 @@ const MainMap = ({ routes = [] }) => {
   const allTiles = React.useMemo(
     () => {
       const store = {};
+
       allActivities.forEach?.(activity => {
         activity.tilesZXY.forEach?.(tile => {
+          // Init tile in store
           if (!store[tile]) {
-            store[tile] = {
-              activities: [],
-              users: [],
-            };
+            store[tile] = { activities: [], users: [] };
           }
           store[tile].activities.push(activity);
 
