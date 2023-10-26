@@ -74,9 +74,9 @@ const Home = () => {
       const id = newShare.split('/').filter(Boolean).pop();
       setShares(prevShares => {
         if (!prevShares[id]) {
-          return { ...prevShares, [id]: {} };
+          prevShares[id] = { disabled: false }; // eslint-disable-line no-param-reassign
         }
-        return prevShares;
+        return { ...prevShares };
       });
 
       event.target.reset();
