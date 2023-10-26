@@ -11,7 +11,7 @@ import createPersistedState from 'use-persisted-state/src';
 
 import useActivities from '../hooks/use-activities';
 import MapContent from './MapContent';
-import { tile2lat, tile2long } from '../lib';
+import { throttle, tile2lat, tile2long } from '../lib';
 
 const useSharesState = createPersistedState('shares');
 
@@ -85,8 +85,8 @@ const MainMap = ({ routes = [] }) => {
     [allActivities],
   );
 
-  const renderTiles = React.useCallback(
-    () => {
+  const renderTiles = React.useCallback( // eslint-disable-line react-hooks/exhaustive-deps
+    throttle(() => {
       const map = mapRef.current;
       window.map = map;
 
@@ -108,7 +108,7 @@ const MainMap = ({ routes = [] }) => {
           count: allTiles[tileRef]?.userCount || 0,
         });
       });
-    },
+    }, 750),
     [allTiles],
   );
 
