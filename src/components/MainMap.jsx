@@ -104,9 +104,14 @@ const MainMap = ({ routes = [] }) => {
 
       features.forEach(feature => {
         const tileRef = feature.properties.id;
-        map.setFeatureState(feature, {
-          count: allTiles[tileRef]?.userCount || 0,
-        });
+
+        if (allTiles[tileRef]?.userCount) {
+          map.setFeatureState(feature, {
+            count: allTiles[tileRef]?.userCount || 0,
+          });
+        } else {
+          map.removeFeatureState(feature);
+        }
       });
     }, 750),
     [allTiles],
@@ -143,6 +148,15 @@ const MainMap = ({ routes = [] }) => {
     },
     [activeTile],
   );
+
+  const popupContent = React.useMemo(
+    () => {
+      if (!activeTile?.id) { return ''; }
+      const { activities, ...tileData } = allTiles[activeTile.id];
+      return JSON.stringify(tileData, null, 2);
+    },
+    [activeTile, allTiles],
+  );
   return (
     <Map
       initialViewState={initialViewState}
@@ -166,7 +180,7 @@ const MainMap = ({ routes = [] }) => {
           closeOnClick={false}
           anchor="bottom-right"
         >
-          <pre>{JSON.stringify(activeTile.state, null, 2)}</pre>
+          <pre>{popupContent}</pre>
         </Popup>
       )}
     </Map>
