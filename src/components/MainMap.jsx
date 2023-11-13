@@ -27,11 +27,8 @@ const MainMap = ({ routes = [] }) => {
   const [activeTile, setActiveTile] = React.useState();
   const [shares] = useSharesState({});
 
-  const location = useLocation();
-  const hashContent = location.hash.substring(1)
-    || Object.entries(shares).map(([id]) => id).join(',');
-
-  const allActivitiesQueries = useActivities(hashContent);
+  const shareIds = Object.entries(shares).map(([id]) => id).join(',');
+  const allActivitiesQueries = useActivities(shareIds);
 
   const allActivities = React.useMemo(
     () => {
