@@ -12,6 +12,7 @@ import createPersistedState from 'use-persisted-state/src';
 import useActivities from '../hooks/use-activities';
 import MapContent from './MapContent';
 import { throttle, tile2lat, tile2long } from '../lib';
+import Cadastre from './Cadastre';
 
 const useSharesState = createPersistedState('shares');
 
@@ -25,6 +26,7 @@ const MainMap = ({ routes = [] }) => {
   const mapRef = React.useRef();
   const [gridBefore, setGridBefore] = React.useState();
   const [activeTile, setActiveTile] = React.useState();
+  const [cadastre] = React.useState(false);
   const [shares] = useSharesState({});
 
   const shareIds = Object.entries(shares).map(([id]) => id).join(',');
@@ -167,6 +169,7 @@ const MainMap = ({ routes = [] }) => {
       interactiveLayerIds={interactiveLayerIds}
       onClick={handleMapClick}
     >
+      <Cadastre show={cadastre} />
       <MapContent gridBefore={gridBefore} routes={routes} />
       {activeTile && (
         <Popup
