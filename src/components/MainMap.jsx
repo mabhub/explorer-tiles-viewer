@@ -168,6 +168,7 @@ const MainMap = ({ routes = [] }) => {
       ref={mapRef}
       interactiveLayerIds={interactiveLayerIds}
       onClick={handleMapClick}
+      hash
     >
       <Cadastre show={cadastre} />
       <MapContent gridBefore={gridBefore} routes={routes} />
