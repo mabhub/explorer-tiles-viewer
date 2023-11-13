@@ -95,9 +95,11 @@ const Home = () => {
         >
           <Paper sx={{ p: 1 }}>
             <FormGroup sx={{ mb: 1, pl: 1 }}>
-              {Object.entries(shares).map(([id, { disabled }]) => (
+              {Object.entries(shares).map(([id, { disabled, alias }]) => (
                 <FormControlLabel
-                  label={id}
+                  label={alias
+                    ? (<>{alias} <small>({id})</small></>)
+                    : id}
                   key={id}
                   control={(
                     <Switch
