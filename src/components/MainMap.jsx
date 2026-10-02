@@ -5,7 +5,6 @@ import * as pmtiles from 'pmtiles';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapLibreGL from 'maplibre-gl';
-import { useLocation } from 'react-router-dom';
 import createPersistedState from 'use-persisted-state/src';
 
 import useActivities from '../hooks/use-activities';
@@ -161,7 +160,5 @@ const MainMap = ({ routes = [] }) => {
     </Map>
   );
 };
-
-MainMap.whyDidYouRender = true;
 
 export default MainMap;

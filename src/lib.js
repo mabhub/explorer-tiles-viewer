@@ -6,12 +6,4 @@ export const tile2lat = (y, z) => {
   return (180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
 };
 
-export const id2coords = id => {
-  const [z, x, y] = id.split('/');
-  return [
-    tile2long(x, z),
-    tile2lat(y, z),
-  ];
-};
-
 export default {};
