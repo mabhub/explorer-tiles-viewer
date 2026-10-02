@@ -1,11 +1,10 @@
 import React from 'react';
 
-import Map from 'react-map-gl/maplibre';
+import Map, { Popup } from 'react-map-gl/maplibre';
 import * as pmtiles from 'pmtiles';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapLibreGL from 'maplibre-gl';
-import { Popup } from 'react-map-gl';
 import { useLocation } from 'react-router-dom';
 import createPersistedState from 'use-persisted-state/src';
 

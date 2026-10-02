@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layer, Source } from 'react-map-gl';
+import { Layer, Source } from 'react-map-gl/maplibre';
 
 const MapContent = ({ gridBefore, routes = [] }) => (
   <>
