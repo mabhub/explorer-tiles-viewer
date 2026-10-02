@@ -33,10 +33,6 @@ const MainMap = ({ routes = [] }) => {
 
   const allActivities = React.useMemo(
     () => {
-      if (allActivitiesQueries.some(({ isLoading }) => isLoading === true)) {
-        return {};
-      }
-
       const store = [];
 
       allActivitiesQueries.forEach(({ data: [id, data] = [], status }) => {
@@ -62,8 +58,8 @@ const MainMap = ({ routes = [] }) => {
     () => {
       const store = {};
 
-      allActivities.forEach?.(activity => {
-        activity.tilesZXY.forEach?.(tile => {
+      allActivities.forEach(activity => {
+        activity.tilesZXY.forEach(tile => {
           // Init tile in store
           if (!store[tile]) {
             store[tile] = { activities: [], users: [] };
