@@ -3,6 +3,9 @@ import { useQueries } from '@tanstack/react-query';
 
 const getActivities = async shareId => {
   const rawResponse = await fetch(import.meta.env.VITE_ACTIVITIES_ENDPOINT.replace('{{id}}', shareId));
+  if (!rawResponse.ok) {
+    throw new Error(`Failed to fetch activities for ${shareId}: HTTP ${rawResponse.status}`);
+  }
   const activities = await rawResponse.json();
   return [shareId, activities];
 };
