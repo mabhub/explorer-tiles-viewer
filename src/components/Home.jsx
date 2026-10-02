@@ -54,13 +54,12 @@ const Home = () => {
 
   const handleShareClick = React.useCallback(
     ({ target: { id } = {} }, checked) => {
-      setShares(prevShares => {
-        const newShares = { ...prevShares };
-        newShares[id].disabled = !checked;
-        return newShares;
-      });
+      setShares(prevShares => ({
+        ...prevShares,
+        [id]: { ...prevShares[id], disabled: !checked },
+      }));
     },
-    [], // eslint-disable-line react-hooks/exhaustive-deps
+    [setShares],
   );
 
   const handleShareSubmit = React.useCallback(
@@ -72,16 +71,13 @@ const Home = () => {
       const { newShare } = Object.fromEntries(formData.entries());
 
       const id = newShare.split('/').filter(Boolean).pop();
-      setShares(prevShares => {
-        if (!prevShares[id]) {
-          prevShares[id] = { disabled: false }; // eslint-disable-line no-param-reassign
-        }
-        return { ...prevShares };
-      });
+      setShares(prevShares => (prevShares[id]
+        ? prevShares
+        : { ...prevShares, [id]: { disabled: false } }));
 
       event.target.reset();
     },
-    [], // eslint-disable-line react-hooks/exhaustive-deps
+    [setShares],
   );
 
   return (
