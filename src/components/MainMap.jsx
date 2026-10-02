@@ -31,51 +31,33 @@ const MainMap = ({ routes = [] }) => {
   const shareIds = Object.entries(shares).map(([id]) => id).join(',');
   const allActivitiesQueries = useActivities(shareIds);
 
-  const allActivities = React.useMemo(
-    () => {
-      const store = [];
-
-      allActivitiesQueries.forEach(({ data: [id, data] = [], status }) => {
-        if (status === 'success') {
-          if (shares[id].disabled !== true) {
-            store.push(data);
-          }
-        }
-      });
-
-      const flat = store.flat().map(({ tiles, ...rest }) => ({
-        ...rest,
-        tiles,
-        tilesZXY: tiles.map(({ x, y }) => `14/${x}/${y}`),
-      }));
-
-      return flat;
-    },
-    [allActivitiesQueries, shares],
-  );
-
   const allTiles = React.useMemo(
     () => {
       const store = {};
 
-      allActivities.forEach(activity => {
-        activity.tilesZXY.forEach(tile => {
-          // Init tile in store
-          if (!store[tile]) {
-            store[tile] = { activities: [], users: [] };
-          }
-          store[tile].activities.push(activity);
+      allActivitiesQueries.forEach(({ data: [id, activities] = [], status }) => {
+        if (status !== 'success' || shares[id].disabled === true) { return; }
 
-          store[tile].users.push(activity.user_id);
-          store[tile].users = Array.from(new Set(store[tile].users));
+        activities.forEach(({ user_id: userId, tiles }) => {
+          tiles.forEach(({ x, y }) => {
+            const key = `14/${x}/${y}`;
+            if (!store[key]) {
+              store[key] = { users: [], activityCount: 0, userCount: 0 };
+            }
+            const tile = store[key];
 
-          store[tile].activityCount = store[tile].activities.length;
-          store[tile].userCount = store[tile].users.length;
+            tile.activityCount += 1;
+            if (!tile.users.includes(userId)) {
+              tile.users.push(userId);
+              tile.userCount = tile.users.length;
+            }
+          });
         });
       });
+
       return store;
     },
-    [allActivities],
+    [allActivitiesQueries, shares],
   );
 
   const renderTiles = React.useCallback( // eslint-disable-line react-hooks/exhaustive-deps
@@ -160,8 +142,7 @@ const MainMap = ({ routes = [] }) => {
   const popupContent = React.useMemo(
     () => {
       if (!activeTileData) { return ''; }
-      const { activities, ...tileData } = activeTileData;
-      return JSON.stringify(tileData, null, 2);
+      return JSON.stringify(activeTileData, null, 2);
     },
     [activeTileData],
   );
