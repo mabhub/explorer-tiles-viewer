@@ -9,8 +9,8 @@ import { useLocation } from 'react-router-dom';
 import createPersistedState from 'use-persisted-state/src';
 
 import useActivities from '../hooks/use-activities';
-import MapContent from './MapContent';
-import { throttle, tile2lat, tile2long } from '../lib';
+import MapContent, { gridFeature } from './MapContent';
+import { tile2lat, tile2long } from '../lib';
 import Cadastre from './Cadastre';
 
 const useSharesState = createPersistedState('shares');
@@ -60,43 +60,28 @@ const MainMap = ({ routes = [] }) => {
     [allActivitiesQueries, shares],
   );
 
-  const renderTiles = React.useCallback( // eslint-disable-line react-hooks/exhaustive-deps
-    throttle(() => {
-      const map = mapRef.current;
-      window.map = map;
+  const [mapLoaded, setMapLoaded] = React.useState(false);
+  const paintedTiles = React.useRef({});
 
-      if (!map) {
-        // eslint-disable-next-line no-console
-        console.info('map is not ready yet');
-        return;
-      }
-      if (!map.getStyle?.()?.layers.find?.(({ id }) => id === 'tiles')) {
-        // eslint-disable-next-line no-console
-        console.info('no such layer: "tiles"');
-        return;
-      }
-      const features = map.queryRenderedFeatures({ layers: ['tiles'] });
-
-      features.forEach(feature => {
-        const tileRef = feature.properties.id;
-
-        if (allTiles[tileRef]?.userCount) {
-          map.setFeatureState(feature, {
-            count: allTiles[tileRef]?.userCount || 0,
-          });
-        } else {
-          map.removeFeatureState(feature);
-        }
-      });
-    }, 750),
-    [allTiles],
-  );
-
+  // Feature states are kept by the source and applied to grid tiles as they
+  // load, so they only need updating when the aggregated data changes.
   React.useEffect(
     () => {
-      renderTiles();
+      if (!mapLoaded) { return; }
+      const map = mapRef.current;
+
+      Object.keys(paintedTiles.current).forEach(id => {
+        if (!allTiles[id]) {
+          map.removeFeatureState({ ...gridFeature, id }, 'count');
+        }
+      });
+      Object.entries(allTiles).forEach(([id, { userCount }]) => {
+        map.setFeatureState({ ...gridFeature, id }, { count: userCount });
+      });
+
+      paintedTiles.current = allTiles;
     },
-    [renderTiles],
+    [allTiles, mapLoaded],
   );
 
   const handleMapLoad = React.useCallback(
@@ -105,9 +90,9 @@ const MainMap = ({ routes = [] }) => {
       if (map.getStyle().layers.map(({ id }) => id).includes('waterway-name')) {
         setGridBefore('waterway-name');
       }
-      renderTiles();
+      setMapLoaded(true);
     },
-    [renderTiles],
+    [],
   );
 
   const handleMapClick = React.useCallback(
@@ -152,10 +137,6 @@ const MainMap = ({ routes = [] }) => {
       style={mapStyle}
       mapStyle={import.meta.env.VITE_DEFAULT_MAPSTYLE}
       onLoad={handleMapLoad}
-      onMoveEnd={renderTiles}
-      onMove={renderTiles}
-      onZoomEnd={renderTiles}
-      onZoom={renderTiles}
       ref={mapRef}
       interactiveLayerIds={interactiveLayerIds}
       onClick={handleMapClick}

@@ -1,9 +1,12 @@
 import React from 'react';
 import { Layer, Source } from 'react-map-gl/maplibre';
 
+export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
+
 const MapContent = ({ gridBefore, routes = [] }) => (
   <>
     <Source
+      id={gridFeature.source}
       type="vector"
       url={import.meta.env.VITE_GRID_VECTOR_TILES}
       promoteId="id"
@@ -11,7 +14,7 @@ const MapContent = ({ gridBefore, routes = [] }) => (
       <Layer
         id="tiles"
         type="fill"
-        source-layer="explorer-tiles"
+        source-layer={gridFeature.sourceLayer}
         paint={{
           'fill-outline-color': '#00000044',
           'fill-color': [
