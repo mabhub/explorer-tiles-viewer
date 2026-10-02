@@ -11,20 +11,18 @@ import {
   TextField,
 } from '@mui/material';
 import { Clear, Upload } from '@mui/icons-material';
-import createPersistedState from 'use-persisted-state/src';
 import togeojson from '@mapbox/togeojson';
 import { DOMParser } from 'xmldom';
 
 import MainMap from './MainMap';
-
-const useSharesState = createPersistedState('shares');
+import useShares from '../hooks/use-shares';
 
 const globalStyles = { 'html, body, #root': { height: '100%' } };
 const wrapperSx = { height: '100%' };
 
 const Home = () => {
   const [routes, setRoutes] = React.useState([]);
-  const [shares, setShares] = useSharesState({});
+  const [shares, setShares] = useShares();
 
   const handleUpload = React.useCallback(
     event => {

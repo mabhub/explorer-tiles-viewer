@@ -5,14 +5,12 @@ import * as pmtiles from 'pmtiles';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapLibreGL from 'maplibre-gl';
-import createPersistedState from 'use-persisted-state/src';
 
 import useActivities from '../hooks/use-activities';
+import useShares from '../hooks/use-shares';
 import MapContent, { gridFeature } from './MapContent';
 import { tile2lat, tile2long } from '../lib';
 import Cadastre from './Cadastre';
-
-const useSharesState = createPersistedState('shares');
 
 const protocol = new pmtiles.Protocol();
 MapLibreGL.addProtocol('pmtiles', protocol.tile);
@@ -25,7 +23,7 @@ const MainMap = ({ routes = [] }) => {
   const [gridBefore, setGridBefore] = React.useState();
   const [activeTile, setActiveTile] = React.useState();
   const [cadastre] = React.useState(false);
-  const [shares] = useSharesState({});
+  const [shares] = useShares();
 
   const shareIds = Object.entries(shares).map(([id]) => id).join(',');
   const allActivitiesQueries = useActivities(shareIds);
