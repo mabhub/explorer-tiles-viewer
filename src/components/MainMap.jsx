@@ -146,13 +146,26 @@ const MainMap = ({ routes = [] }) => {
     [activeTile],
   );
 
+  const activeTileData = activeTile && allTiles[activeTile.id];
+
+  // Close the popup once its tile is no longer part of the displayed shares
+  React.useEffect(
+    () => {
+      if (activeTile && !activeTileData) {
+        mapRef.current?.setFeatureState(activeTile, { clicked: false });
+        setActiveTile();
+      }
+    },
+    [activeTile, activeTileData],
+  );
+
   const popupContent = React.useMemo(
     () => {
-      if (!activeTile?.id) { return ''; }
-      const { activities, ...tileData } = allTiles[activeTile.id];
+      if (!activeTileData) { return ''; }
+      const { activities, ...tileData } = activeTileData;
       return JSON.stringify(tileData, null, 2);
     },
-    [activeTile, allTiles],
+    [activeTileData],
   );
   return (
     <Map
@@ -171,7 +184,7 @@ const MainMap = ({ routes = [] }) => {
     >
       <Cadastre show={cadastre} />
       <MapContent gridBefore={gridBefore} routes={routes} />
-      {activeTile && (
+      {activeTileData && (
         <Popup
           latitude={tile2lat(activeTile.id.split('/').at(2), 14)}
           longitude={tile2long(activeTile.id.split('/').at(1), 14)}
