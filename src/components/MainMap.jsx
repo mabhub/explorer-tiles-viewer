@@ -134,6 +134,8 @@ const MainMap = ({ routes = [] }) => {
 
   const handleMapClick = React.useCallback(
     ({ features: [feature], target: map }) => {
+      if (!feature) { return; }
+
       if (feature.id === activeTile?.id) {
         map.setFeatureState(activeTile, { clicked: false });
         setActiveTile(null);
