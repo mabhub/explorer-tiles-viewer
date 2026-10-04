@@ -203,16 +203,18 @@ const MainMap = ({
 
   const handleMapClick = React.useCallback(
     ({ features: [feature], target: map }) => {
-      if (!feature) { return; }
-
-      if (feature.id === activeTile?.id) {
-        map.setFeatureState(activeTile, { clicked: false });
-        setActiveTile(null);
-      } else if (feature.state.count) {
-        activeTile && map.setFeatureState(activeTile, { clicked: false });
-        map.setFeatureState(feature, { clicked: true });
-        setActiveTile(feature);
+      // The open tile again, an unvisited tile or no tile at all: close the popup
+      if (feature?.id === activeTile?.id || !feature?.state.count) {
+        if (activeTile) {
+          map.setFeatureState(activeTile, { clicked: false });
+          setActiveTile(null);
+        }
+        return;
       }
+
+      activeTile && map.setFeatureState(activeTile, { clicked: false });
+      map.setFeatureState(feature, { clicked: true });
+      setActiveTile(feature);
     },
     [activeTile],
   );
