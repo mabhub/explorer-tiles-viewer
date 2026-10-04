@@ -1,9 +1,44 @@
 import React from 'react';
 import { Layer, Source } from 'react-map-gl/maplibre';
 
+import { shareColors, sharedColors } from '../share-colors';
+
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
 
-const MapContent = ({ gridBefore, routes = [] }) => (
+const isUnvisited = ['!', ['to-boolean', ['feature-state', 'count']]];
+
+const countColor = [
+  'case',
+  isUnvisited, '#fff0',
+  ['==', ['feature-state', 'count'], 1], 'green',
+  ['==', ['feature-state', 'count'], 2], 'orange',
+  ['>=', ['feature-state', 'count'], 3], 'red',
+  '#fff0',
+];
+
+const getOwnerColor = activeShareCount => [
+  'case',
+  isUnvisited, '#fff0',
+  [
+    'match', ['number', ['feature-state', 'owner'], -1],
+    ...shareColors.flatMap((color, index) => [index, color]),
+    // Not owned by a single share: shade by the number of owners
+    activeShareCount > 2
+      ? [
+        'interpolate', ['linear'], ['number', ['feature-state', 'count'], 2],
+        2, sharedColors.fewest,
+        activeShareCount, sharedColors.all,
+      ]
+      : sharedColors.all,
+  ],
+];
+
+const MapContent = ({
+  gridBefore,
+  routes = [],
+  colorMode,
+  activeShareCount,
+}) => (
   <>
     <Source
       id={gridFeature.source}
@@ -17,14 +52,9 @@ const MapContent = ({ gridBefore, routes = [] }) => (
         source-layer={gridFeature.sourceLayer}
         paint={{
           'fill-outline-color': '#00000044',
-          'fill-color': [
-            'case',
-            ['!', ['to-boolean', ['feature-state', 'count']]], '#fff0',
-            ['==', ['feature-state', 'count'], 1], 'green',
-            ['==', ['feature-state', 'count'], 2], 'orange',
-            ['>=', ['feature-state', 'count'], 3], 'red',
-            '#fff0',
-          ],
+          'fill-color': colorMode === 'owner'
+            ? getOwnerColor(activeShareCount)
+            : countColor,
           'fill-opacity': [
             'case',
             ['==', ['feature-state', 'clicked'], true], 0.75,

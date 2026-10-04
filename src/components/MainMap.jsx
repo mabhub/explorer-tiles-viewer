@@ -7,10 +7,11 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import MapLibreGL from 'maplibre-gl';
 
 import useActivities from '../hooks/use-activities';
-import useShares from '../hooks/use-shares';
+import useShares, { isShareActive } from '../hooks/use-shares';
 import MapContent, { gridFeature } from './MapContent';
 import { tile2lat, tile2long } from '../lib';
 import Cadastre from './Cadastre';
+import { getShareColorIndex } from '../share-colors';
 
 const protocol = new pmtiles.Protocol();
 MapLibreGL.addProtocol('pmtiles', protocol.tile);
@@ -18,28 +19,29 @@ const initialViewState = { longitude: 1.4, latitude: 43.6, zoom: 11 };
 const mapStyle = { width: '100%', minHeight: 100, height: '100%' };
 const interactiveLayerIds = ['tiles'];
 
-const MainMap = ({ routes = [] }) => {
+const MainMap = ({ routes = [], colorMode }) => {
   const mapRef = React.useRef();
   const [gridBefore, setGridBefore] = React.useState();
   const [activeTile, setActiveTile] = React.useState();
   const [cadastre] = React.useState(false);
   const [shares] = useShares();
 
-  const shareIds = Object.entries(shares).map(([id]) => id).join(',');
+  const shareIds = Object.keys(shares).join(',');
   const allActivitiesQueries = useActivities(shareIds);
+  const activeShareCount = Object.values(shares).filter(isShareActive).length;
 
   const allTiles = React.useMemo(
     () => {
       const store = {};
 
       allActivitiesQueries.forEach(({ data: [id, activities] = [], status }) => {
-        if (status !== 'success' || shares[id].disabled === true) { return; }
+        if (status !== 'success' || !isShareActive(shares[id])) { return; }
 
         activities.forEach(({ user_id: userId, tiles }) => {
           tiles.forEach(({ x, y }) => {
             const key = `14/${x}/${y}`;
             if (!store[key]) {
-              store[key] = { users: [], activityCount: 0, userCount: 0 };
+              store[key] = { users: [], shares: [], activityCount: 0, userCount: 0 };
             }
             const tile = store[key];
 
@@ -47,6 +49,9 @@ const MainMap = ({ routes = [] }) => {
             if (!tile.users.includes(userId)) {
               tile.users.push(userId);
               tile.userCount = tile.users.length;
+            }
+            if (!tile.shares.includes(id)) {
+              tile.shares.push(id);
             }
           });
         });
@@ -66,19 +71,25 @@ const MainMap = ({ routes = [] }) => {
     () => {
       if (!mapLoaded) { return; }
       const map = mapRef.current;
+      const shareIdList = shareIds.split(',');
 
       Object.keys(paintedTiles.current).forEach(id => {
         if (!allTiles[id]) {
           map.removeFeatureState({ ...gridFeature, id }, 'count');
+          map.removeFeatureState({ ...gridFeature, id }, 'owner');
         }
       });
-      Object.entries(allTiles).forEach(([id, { userCount }]) => {
-        map.setFeatureState({ ...gridFeature, id }, { count: userCount });
+      Object.entries(allTiles).forEach(([id, { userCount, shares: owners }]) => {
+        map.setFeatureState({ ...gridFeature, id }, {
+          count: userCount,
+          // Color index of the only owning share, -1 when several shares own it
+          owner: owners.length === 1 ? getShareColorIndex(shareIdList, owners[0]) : -1,
+        });
       });
 
       paintedTiles.current = allTiles;
     },
-    [allTiles, mapLoaded],
+    [allTiles, mapLoaded, shareIds],
   );
 
   const handleMapLoad = React.useCallback(
@@ -140,7 +151,12 @@ const MainMap = ({ routes = [] }) => {
       hash
     >
       <Cadastre show={cadastre} />
-      <MapContent gridBefore={gridBefore} routes={routes} />
+      <MapContent
+        gridBefore={gridBefore}
+        routes={routes}
+        colorMode={colorMode}
+        activeShareCount={activeShareCount}
+      />
       {activeTileData && (
         <Popup
           latitude={tile2lat(activeTile.id.split('/').at(2), 14)}
