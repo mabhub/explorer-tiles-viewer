@@ -5,12 +5,15 @@ import * as pmtiles from 'pmtiles';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapLibreGL from 'maplibre-gl';
+import useLocalStorageState from 'use-local-storage-state';
 
 import useActivities from '../hooks/use-activities';
 import useShares, { isShareActive } from '../hooks/use-shares';
 import MapContent, { gridFeature } from './MapContent';
 import { tile2lat, tile2long } from '../lib';
 import Cadastre from './Cadastre';
+import MapContextMenu from './MapContextMenu';
+import { defaultBasemap, getBasemap } from '../basemaps';
 
 const protocol = new pmtiles.Protocol();
 MapLibreGL.addProtocol('pmtiles', protocol.tile);
@@ -25,7 +28,12 @@ const MainMap = ({
   activePersonCount,
 }) => {
   const mapRef = React.useRef();
-  const [gridBefore, setGridBefore] = React.useState();
+  // Labels of the basemap (vector ones only) to keep above the grid, looked up
+  // each time the grid is added to a new style
+  const [labelsLayer, setLabelsLayer] = React.useState();
+  const [basemapId, setBasemapId] = useLocalStorageState('basemap', { defaultValue: defaultBasemap.id });
+  const basemap = getBasemap(basemapId);
+  const [contextMenuPosition, setContextMenuPosition] = React.useState();
   const [activeTile, setActiveTile] = React.useState();
   const [cadastre] = React.useState(false);
   const [shares] = useShares();
@@ -65,14 +73,16 @@ const MainMap = ({
     [allActivitiesQueries, shares],
   );
 
-  const [mapLoaded, setMapLoaded] = React.useState(false);
+  // Bumped each time the grid source is (re)created: a basemap change replaces
+  // the whole style, feature states included
+  const [gridVersion, setGridVersion] = React.useState(0);
   const paintedTiles = React.useRef({});
 
   // Feature states are kept by the source and applied to grid tiles as they
   // load, so they only need updating when the aggregated data changes.
   React.useEffect(
     () => {
-      if (!mapLoaded) { return; }
+      if (!gridVersion) { return; }
       const map = mapRef.current;
 
       Object.keys(paintedTiles.current).forEach(id => {
@@ -92,16 +102,50 @@ const MainMap = ({
 
       paintedTiles.current = allTiles;
     },
-    [allTiles, mapLoaded, colorByShare],
+    [allTiles, gridVersion, colorByShare],
+  );
+
+  // A new grid source has lost the highlight of the tile whose popup is open
+  React.useEffect(
+    () => {
+      if (gridVersion && activeTile) {
+        mapRef.current.setFeatureState(activeTile, { clicked: true });
+      }
+    },
+    [gridVersion, activeTile],
   );
 
   const handleMapLoad = React.useCallback(
     ({ target: map }) => {
       window.map = map;
-      if (map.getStyle().layers.map(({ id }) => id).includes('waterway-name')) {
-        setGridBefore('waterway-name');
-      }
-      setMapLoaded(true);
+    },
+    [],
+  );
+
+  const handleSourceData = React.useCallback(
+    ({ sourceId, sourceDataType, target: map }) => {
+      // A replaced style also reports metadata for its removed grid source
+      if (sourceId !== gridFeature.source || sourceDataType !== 'metadata'
+        || !map.getSource(gridFeature.source)) { return; }
+      setLabelsLayer(map.getLayer('waterway-name') ? 'waterway-name' : undefined);
+      setGridVersion(version => version + 1);
+    },
+    [],
+  );
+
+  const handleBasemapChange = React.useCallback(
+    id => {
+      // Until the new style is there, its labels layer is unknown
+      setLabelsLayer();
+      setBasemapId(id);
+    },
+    [setBasemapId],
+  );
+
+  const handleContextMenu = React.useCallback(
+    ({ originalEvent }) => {
+      originalEvent.preventDefault();
+      setContextMenuPosition({ x: originalEvent.clientX, y: originalEvent.clientY });
     },
     [],
   );
@@ -146,8 +190,10 @@ const MainMap = ({
     <Map
       initialViewState={initialViewState}
       style={mapStyle}
-      mapStyle={import.meta.env.VITE_DEFAULT_MAPSTYLE}
+      mapStyle={basemap.style}
       onLoad={handleMapLoad}
+      onSourceData={handleSourceData}
+      onContextMenu={handleContextMenu}
       ref={mapRef}
       interactiveLayerIds={interactiveLayerIds}
       onClick={handleMapClick}
@@ -155,7 +201,7 @@ const MainMap = ({
     >
       <Cadastre show={cadastre} />
       <MapContent
-        gridBefore={gridBefore}
+        gridBefore={labelsLayer}
         routes={routes}
         colorMode={colorMode}
         activePersonCount={activePersonCount}
@@ -174,6 +220,12 @@ const MainMap = ({
           <pre>{popupContent}</pre>
         </Popup>
       )}
+      <MapContextMenu
+        position={contextMenuPosition}
+        onClose={() => setContextMenuPosition()}
+        basemapId={basemap.id}
+        onBasemapChange={handleBasemapChange}
+      />
     </Map>
   );
 };
