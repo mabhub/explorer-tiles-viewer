@@ -110,7 +110,9 @@ const Home = () => {
 
       return {
         firstShareByShare: firstShares,
-        colorByShare: Object.fromEntries(ids.map(id => [id, getShareColor(shares, ids, firstShares[id])])),
+        colorByShare: Object.fromEntries(
+          ids.map(id => [id, getShareColor(shares, ids, firstShares[id])]),
+        ),
         activePersonCount: new Set(activePeople).size,
       };
     },
@@ -194,7 +196,10 @@ const Home = () => {
   const handleColorChange = React.useCallback(
     (id, color) => {
       const firstShare = firstShareByShare[id];
-      setShares(prevShares => ({ ...prevShares, [firstShare]: { ...prevShares[firstShare], color } }));
+      setShares(prevShares => ({
+        ...prevShares,
+        [firstShare]: { ...prevShares[firstShare], color },
+      }));
     },
     [setShares, firstShareByShare],
   );

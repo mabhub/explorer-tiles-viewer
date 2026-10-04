@@ -290,7 +290,9 @@ const MainMap = ({
         basemapId={basemap.id}
         onBasemapChange={handleBasemapChange}
         maxAreas={maxAreas}
-        onMaxAreaToggle={kind => setMaxAreas(previous => ({ ...previous, [kind]: !previous[kind] }))}
+        onMaxAreaToggle={kind => setMaxAreas(
+          previous => ({ ...previous, [kind]: !previous[kind] }),
+        )}
         canShowMaxAreas={colorMode === 'owner'}
         showGrid={showGrid}
         onGridToggle={() => setShowGrid(previous => !previous)}
