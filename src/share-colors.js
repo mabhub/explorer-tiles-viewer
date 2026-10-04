@@ -1,4 +1,4 @@
-// Per-account colors for the owner coloring mode. Reds and oranges are left
+// Per-person colors for the owner coloring mode. Reds and oranges are left
 // out: the count coloring mode uses them.
 export const shareColors = [
   '#1e88e5',
@@ -11,12 +11,22 @@ export const shareColors = [
   '#7cb342',
 ];
 
-// Tiles owned by several accounts: lightest when shared by two of them,
-// darkest when shared by all active accounts
+// Tiles owned by several people: lightest when shared by two of them,
+// darkest when shared by all active people
 export const sharedColors = { fewest: '#757575', all: '#000000' };
 
-// Colors follow the order of the shares list, disabled shares included, so an
-// account keeps its color when other ones are toggled
-export const getShareColorIndex = (shareIds, id) => shareIds.indexOf(id) % shareColors.length;
+// One color per person, the one of their first share in the list, since a
+// person can have several shares. Disabled shares keep their place, so people
+// keep their color when other shares are toggled. A share not loaded yet
+// counts as its own person.
+export const getColorIndexByShare = (shareIds, personByShare) => {
+  const firstIndexByPerson = {};
 
-export const getShareColor = (shareIds, id) => shareColors[getShareColorIndex(shareIds, id)];
+  return Object.fromEntries(shareIds.map((id, index) => {
+    const person = personByShare[id] ?? id;
+    if (!(person in firstIndexByPerson)) {
+      firstIndexByPerson[person] = index;
+    }
+    return [id, firstIndexByPerson[person] % shareColors.length];
+  }));
+};

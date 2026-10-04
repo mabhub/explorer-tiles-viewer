@@ -11,7 +11,6 @@ import useShares, { isShareActive } from '../hooks/use-shares';
 import MapContent, { gridFeature } from './MapContent';
 import { tile2lat, tile2long } from '../lib';
 import Cadastre from './Cadastre';
-import { getShareColorIndex } from '../share-colors';
 
 const protocol = new pmtiles.Protocol();
 MapLibreGL.addProtocol('pmtiles', protocol.tile);
@@ -19,7 +18,12 @@ const initialViewState = { longitude: 1.4, latitude: 43.6, zoom: 11 };
 const mapStyle = { width: '100%', minHeight: 100, height: '100%' };
 const interactiveLayerIds = ['tiles'];
 
-const MainMap = ({ routes = [], colorMode }) => {
+const MainMap = ({
+  routes = [],
+  colorMode,
+  colorIndexByShare,
+  activePersonCount,
+}) => {
   const mapRef = React.useRef();
   const [gridBefore, setGridBefore] = React.useState();
   const [activeTile, setActiveTile] = React.useState();
@@ -28,7 +32,6 @@ const MainMap = ({ routes = [], colorMode }) => {
 
   const shareIds = Object.keys(shares).join(',');
   const allActivitiesQueries = useActivities(shareIds);
-  const activeShareCount = Object.values(shares).filter(isShareActive).length;
 
   const allTiles = React.useMemo(
     () => {
@@ -71,7 +74,6 @@ const MainMap = ({ routes = [], colorMode }) => {
     () => {
       if (!mapLoaded) { return; }
       const map = mapRef.current;
-      const shareIdList = shareIds.split(',');
 
       Object.keys(paintedTiles.current).forEach(id => {
         if (!allTiles[id]) {
@@ -82,14 +84,15 @@ const MainMap = ({ routes = [], colorMode }) => {
       Object.entries(allTiles).forEach(([id, { userCount, shares: owners }]) => {
         map.setFeatureState({ ...gridFeature, id }, {
           count: userCount,
-          // Color index of the only owning share, -1 when several shares own it
-          owner: owners.length === 1 ? getShareColorIndex(shareIdList, owners[0]) : -1,
+          // Color index of the only owning person (all their shares share it),
+          // -1 when several people own the tile
+          owner: userCount === 1 ? colorIndexByShare[owners[0]] : -1,
         });
       });
 
       paintedTiles.current = allTiles;
     },
-    [allTiles, mapLoaded, shareIds],
+    [allTiles, mapLoaded, colorIndexByShare],
   );
 
   const handleMapLoad = React.useCallback(
@@ -155,7 +158,7 @@ const MainMap = ({ routes = [], colorMode }) => {
         gridBefore={gridBefore}
         routes={routes}
         colorMode={colorMode}
-        activeShareCount={activeShareCount}
+        activePersonCount={activePersonCount}
       />
       {activeTileData && (
         <Popup

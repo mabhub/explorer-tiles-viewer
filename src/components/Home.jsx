@@ -20,10 +20,10 @@ import { DOMParser } from 'xmldom';
 import useLocalStorageState from 'use-local-storage-state';
 
 import MainMap from './MainMap';
-import useActivities from '../hooks/use-activities';
+import useActivities, { getPersonByShare } from '../hooks/use-activities';
 import useShareAccounts from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
-import { getShareColor, sharedColors } from '../share-colors';
+import { getColorIndexByShare, shareColors, sharedColors } from '../share-colors';
 
 const globalStyles = { 'html, body, #root': { height: '100%' } };
 const wrapperSx = { height: '100%' };
@@ -66,7 +66,23 @@ const Home = () => {
   // Same queries as the map: React Query shares them, nothing is fetched twice
   const shareQueries = useActivities(shareIdList.join(','));
   const shareAccounts = useShareAccounts(shareIdList);
-  const activeShareCount = Object.values(shares).filter(isShareActive).length;
+
+  // Several shares of the same person count as one owner
+  const { colorIndexByShare, activePersonCount } = React.useMemo(
+    () => {
+      const ids = Object.keys(shares);
+      const personByShare = getPersonByShare(ids, shareQueries);
+      const activePeople = ids
+        .filter(id => isShareActive(shares[id]) && personByShare[id] !== undefined)
+        .map(id => personByShare[id]);
+
+      return {
+        colorIndexByShare: getColorIndexByShare(ids, personByShare),
+        activePersonCount: new Set(activePeople).size,
+      };
+    },
+    [shares, shareQueries],
+  );
 
   const handleColorModeChange = React.useCallback(
     (event, mode) => {
@@ -139,7 +155,12 @@ const Home = () => {
     <>
       <GlobalStyles styles={globalStyles} />
       <Box sx={wrapperSx}>
-        <MainMap routes={routes} colorMode={colorMode} />
+        <MainMap
+          routes={routes}
+          colorMode={colorMode}
+          colorIndexByShare={colorIndexByShare}
+          activePersonCount={activePersonCount}
+        />
         <Stack
           spacing={1}
           sx={{ position: 'absolute', left: '1rem', top: '1rem' }}
@@ -165,7 +186,7 @@ const Home = () => {
                       {colorMode === 'owner' && (
                         <Box
                           component="span"
-                          sx={{ ...swatchSx, mr: 1, bgcolor: getShareColor(shareIdList, id) }}
+                          sx={{ ...swatchSx, mr: 1, bgcolor: shareColors[colorIndexByShare[id]] }}
                         />
                       )}
                       <ShareName id={id} alias={alias} account={shareAccounts[index]?.data} />
@@ -201,20 +222,20 @@ const Home = () => {
               ))}
             </FormGroup>
 
-            {colorMode === 'owner' && activeShareCount > 1 && (
+            {colorMode === 'owner' && activePersonCount > 1 && (
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1, pl: 1 }}>
                 <small>Partagé par</small>
-                {activeShareCount > 2 && <small>2</small>}
+                {activePersonCount > 2 && <small>2</small>}
                 <Box
                   component="span"
                   sx={{
                     ...swatchSx,
                     width: 48,
                     borderRadius: 1,
-                    background: sharedSwatchBackground(activeShareCount),
+                    background: sharedSwatchBackground(activePersonCount),
                   }}
                 />
-                <small>{activeShareCount}</small>
+                <small>{activePersonCount}</small>
               </Stack>
             )}
 

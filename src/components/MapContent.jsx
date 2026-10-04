@@ -16,18 +16,18 @@ const countColor = [
   '#fff0',
 ];
 
-const getOwnerColor = activeShareCount => [
+const getOwnerColor = activePersonCount => [
   'case',
   isUnvisited, '#fff0',
   [
     'match', ['number', ['feature-state', 'owner'], -1],
     ...shareColors.flatMap((color, index) => [index, color]),
-    // Not owned by a single share: shade by the number of owners
-    activeShareCount > 2
+    // Owned by several people: shade by their number
+    activePersonCount > 2
       ? [
         'interpolate', ['linear'], ['number', ['feature-state', 'count'], 2],
         2, sharedColors.fewest,
-        activeShareCount, sharedColors.all,
+        activePersonCount, sharedColors.all,
       ]
       : sharedColors.all,
   ],
@@ -37,7 +37,7 @@ const MapContent = ({
   gridBefore,
   routes = [],
   colorMode,
-  activeShareCount,
+  activePersonCount,
 }) => (
   <>
     <Source
@@ -53,7 +53,7 @@ const MapContent = ({
         paint={{
           'fill-outline-color': '#00000044',
           'fill-color': colorMode === 'owner'
-            ? getOwnerColor(activeShareCount)
+            ? getOwnerColor(activePersonCount)
             : countColor,
           'fill-opacity': [
             'case',

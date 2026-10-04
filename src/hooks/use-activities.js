@@ -10,6 +10,11 @@ const getActivities = async shareId => {
   return [shareId, activities];
 };
 
+// The Statshunters user behind each loaded share, by share id
+export const getPersonByShare = (shareIds, activityQueries) => Object.fromEntries(
+  shareIds.map((id, index) => [id, activityQueries[index]?.data?.[1][0]?.user_id]),
+);
+
 const EMPTY = [];
 
 const useActivities = shareIdsString => {
