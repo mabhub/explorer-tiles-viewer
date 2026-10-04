@@ -215,7 +215,12 @@ const Home = () => {
         />
         <Stack
           spacing={1}
-          sx={{ position: 'absolute', left: '1rem', top: '1rem' }}
+          sx={{
+            position: 'absolute',
+            left: '1rem',
+            top: '1rem',
+            maxWidth: 'calc(100% - 2rem)',
+          }}
         >
           {isPanelCollapsed && (
             <Fab
