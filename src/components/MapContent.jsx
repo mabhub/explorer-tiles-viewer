@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layer, Source } from 'react-map-gl/maplibre';
 
-import { sharedColors } from '../share-colors';
+import { countColors, sharedColors } from '../share-colors';
 
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
 
@@ -10,9 +10,9 @@ const isUnvisited = ['!', ['to-boolean', ['feature-state', 'count']]];
 const countColor = [
   'case',
   isUnvisited, '#fff0',
-  ['==', ['feature-state', 'count'], 1], 'green',
-  ['==', ['feature-state', 'count'], 2], 'orange',
-  ['>=', ['feature-state', 'count'], 3], 'red',
+  ['==', ['feature-state', 'count'], 1], countColors[0],
+  ['==', ['feature-state', 'count'], 2], countColors[1],
+  ['>=', ['feature-state', 'count'], 3], countColors[2],
   '#fff0',
 ];
 

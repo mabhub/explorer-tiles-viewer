@@ -1,3 +1,6 @@
+// Count coloring mode: tiles owned by 1, 2, then 3 people or more
+export const countColors = ['green', 'orange', 'red'];
+
 // Per-person colors for the owner coloring mode. Reds and oranges are left
 // out: the count coloring mode uses them.
 export const shareColors = [
