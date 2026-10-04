@@ -9,10 +9,17 @@ import {
   currentYear,
   sharedColors,
 } from '../share-colors';
+import { getTrackGeojson } from '../tracks';
 
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
 
 const isUnvisited = ['!', ['to-boolean', ['feature-state', 'count']]];
+const hasTrack = ['to-boolean', ['feature-state', 'track']];
+const isUncolored = ['all', isUnvisited, ['!', hasTrack]];
+
+// Unvisited tiles take the color of the first active track going through
+// them, if any
+const unvisitedColor = ['case', hasTrack, ['to-color', ['feature-state', 'track']], '#fff0'];
 
 const outlineColor = '#00000044';
 
@@ -21,14 +28,14 @@ const outlineColor = '#00000044';
 const getOutlineColor = showGrid => (showGrid
   ? [
     'interpolate', ['linear'], ['zoom'],
-    9, ['case', isUnvisited, '#0000', outlineColor],
+    9, ['case', isUncolored, '#0000', outlineColor],
     10, outlineColor,
   ]
-  : ['case', isUnvisited, '#0000', outlineColor]);
+  : ['case', isUncolored, '#0000', outlineColor]);
 
 const countColor = [
   'case',
-  isUnvisited, '#fff0',
+  isUnvisited, unvisitedColor,
   ['==', ['feature-state', 'count'], 1], countColors[0],
   ['==', ['feature-state', 'count'], 2], countColors[1],
   ['>=', ['feature-state', 'count'], 3], countColors[2],
@@ -38,7 +45,7 @@ const countColor = [
 // Tiles without a known date (missing in the data) count as the oldest
 const ageColor = [
   'case',
-  isUnvisited, '#fff0',
+  isUnvisited, unvisitedColor,
   ['!', ['to-boolean', ['feature-state', 'year']]], ageColors.at(-1),
   [
     'step', ['-', currentYear, ['number', ['feature-state', 'year'], 0]],
@@ -49,7 +56,7 @@ const ageColor = [
 
 const activityColor = [
   'case',
-  isUnvisited, '#fff0',
+  isUnvisited, unvisitedColor,
   [
     'step', ['number', ['feature-state', 'activities'], 0],
     activityColors[0],
@@ -60,7 +67,7 @@ const activityColor = [
 
 const getOwnerColor = activePersonCount => [
   'case',
-  isUnvisited, '#fff0',
+  isUnvisited, unvisitedColor,
   // Owned by a single person: their color
   ['to-boolean', ['feature-state', 'color']], ['to-color', ['feature-state', 'color']],
   // Owned by several people: shade by their number
@@ -81,12 +88,12 @@ const getFillColor = (colorMode, countActivities, activePersonCount) => {
 
 const MapContent = ({
   gridBefore,
-  routes = [],
   colorMode,
   countActivities,
   activePersonCount,
   maxAreas,
   showGrid,
+  tracks = [],
 }) => (
   <>
     <Source
@@ -121,10 +128,9 @@ const MapContent = ({
       />
     </Source>
 
-    {routes.map((route, index) => (
-      // eslint-disable-next-line react/no-array-index-key
-      <Source type="geojson" data={route} key={index}>
-        <Layer type="line" paint={{ 'line-color': 'red', 'line-opacity': 0.5, 'line-width': 3 }} />
+    {tracks.filter(({ disabled }) => !disabled).map(({ id, color, lines }) => (
+      <Source key={id} type="geojson" data={getTrackGeojson(lines)}>
+        <Layer type="line" paint={{ 'line-color': color, 'line-width': 3 }} />
       </Source>
     ))}
   </>

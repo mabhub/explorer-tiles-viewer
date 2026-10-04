@@ -21,6 +21,7 @@ import {
   toPolygon,
 } from '../max-areas';
 import { defaultBasemap, getBasemap } from '../basemaps';
+import { getTrackTiles } from '../tracks';
 
 const protocol = new pmtiles.Protocol();
 MapLibreGL.addProtocol('pmtiles', protocol.tile);
@@ -31,7 +32,7 @@ const noMaxAreas = { square: false, line: false, column: false };
 const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxColumn };
 
 const MainMap = ({
-  routes = [],
+  tracks,
   colorMode,
   countActivities,
   onCountActivitiesToggle,
@@ -140,6 +141,19 @@ const MainMap = ({
     [allActivitiesQueries, shares, maxAreas, colorMode, colorByShare],
   );
 
+  // Uncolored tiles crossed by an active track take its color, the first
+  // track of the list winning
+  const trackColorByTile = React.useMemo(
+    () => {
+      const colors = {};
+      tracks.filter(({ disabled }) => !disabled).forEach(({ lines, color }) => {
+        getTrackTiles(lines).forEach(id => { colors[id] = colors[id] ?? color; });
+      });
+      return colors;
+    },
+    [tracks],
+  );
+
   // Bumped each time the grid source is (re)created: a basemap change replaces
   // the whole style, feature states included
   const [gridVersion, setGridVersion] = React.useState(0);
@@ -179,6 +193,28 @@ const MainMap = ({
       paintedTiles.current = allTiles;
     },
     [allTiles, gridVersion, colorByShare],
+  );
+
+  // Painted apart from the visited tiles: a tile keeps its track color
+  // underneath, shown once no active share visits it
+  const paintedTrackTiles = React.useRef({});
+  React.useEffect(
+    () => {
+      if (!gridVersion) { return; }
+      const map = mapRef.current;
+
+      Object.keys(paintedTrackTiles.current).forEach(id => {
+        if (!trackColorByTile[id]) {
+          map.removeFeatureState({ ...gridFeature, id }, 'track');
+        }
+      });
+      Object.entries(trackColorByTile).forEach(([id, track]) => {
+        map.setFeatureState({ ...gridFeature, id }, { track });
+      });
+
+      paintedTrackTiles.current = trackColorByTile;
+    },
+    [trackColorByTile, gridVersion],
   );
 
   // A new grid source has lost the highlight of the tile whose popup is open
@@ -259,6 +295,8 @@ const MainMap = ({
 
   return (
     <Map
+      // Reached from outside the map through useMap()
+      id="main"
       initialViewState={initialViewState}
       style={mapStyle}
       mapStyle={basemap.style}
@@ -273,7 +311,7 @@ const MainMap = ({
       <Cadastre show={cadastre} />
       <MapContent
         gridBefore={labelsLayer}
-        routes={routes}
+        tracks={tracks}
         colorMode={colorMode}
         countActivities={countActivities}
         activePersonCount={activePersonCount}

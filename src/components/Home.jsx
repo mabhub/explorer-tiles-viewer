@@ -15,22 +15,23 @@ import {
 } from '@mui/material';
 import {
   ChevronLeft,
-  Clear,
   ErrorOutline,
   MoreVert,
   People,
   Upload,
 } from '@mui/icons-material';
-import togeojson from '@mapbox/togeojson';
-import { DOMParser } from 'xmldom';
+import { useMap } from 'react-map-gl/maplibre';
 import useLocalStorageState from 'use-local-storage-state';
 
 import MainMap from './MainMap';
 import ShareContextMenu from './ShareContextMenu';
 import ShareDialog from './ShareDialog';
+import TrackContextMenu from './TrackContextMenu';
+import TrackDialog from './TrackDialog';
 import useActivities, { getPersonByShare } from '../hooks/use-activities';
 import useShareAccounts, { getAccountName } from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
+import useTracks from '../hooks/use-tracks';
 import {
   activityColors,
   activityThresholds,
@@ -42,6 +43,7 @@ import {
   pickShareColor,
   sharedColors,
 } from '../share-colors';
+import { getTrackBounds, parseTrack } from '../tracks';
 
 const globalStyles = { 'html, body, #root': { height: '100%' } };
 const wrapperSx = { height: '100%' };
@@ -98,9 +100,19 @@ const ShareName = ({
   );
 };
 
+// Track names can be long activity names
+const trackNameSx = {
+  cursor: 'pointer',
+  maxWidth: 240,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
 const Home = () => {
-  const [routes, setRoutes] = React.useState([]);
+  const { main: map } = useMap();
   const [shares, setShares] = useShares();
+  const [tracks, setTracks] = useTracks();
   const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
   // Variant of the count coloring mode: activities instead of people
   const [countActivities, setCountActivities] = useLocalStorageState('countActivities', { defaultValue: false });
@@ -113,7 +125,12 @@ const Home = () => {
   // Account whose context menu is open, and where: { id, x, y }
   const [shareMenu, setShareMenu] = React.useState();
   const [hideShareIds, setHideShareIds] = useLocalStorageState('hideShareIds', { defaultValue: false });
-  // Last deletion or color reset, undoable for a few seconds: { message, shares }.
+  // Track whose context menu is open, and where: { id, x, y }
+  const [trackMenu, setTrackMenu] = React.useState();
+  // Track renamed in its dialog, kept while the dialog fades out
+  const [dialogTrack, setDialogTrack] = React.useState();
+  const [isTrackDialogOpen, setIsTrackDialogOpen] = React.useState(false);
+  // Last deletion or color reset, undoable for a few seconds: { message, undo }.
   // Kept while the snackbar fades out.
   const [undoable, setUndoable] = React.useState();
   const [isUndoShown, setIsUndoShown] = React.useState(false);
@@ -162,31 +179,45 @@ const Home = () => {
     [setColorMode],
   );
 
-  const handleUpload = React.useCallback(
-    event => {
-      const { files } = event.target;
+  // New shares and tracks get a color far from the ones of both
+  const getUsedColors = otherTracks => [
+    ...Object.values(colorByShare),
+    ...otherTracks.map(({ color }) => color),
+  ];
 
-      // eslint-disable-next-line no-restricted-syntax
-      for (const file of files) {
-        // console.log(file);
-        const reader = new FileReader();
-        reader.onload = evnt => {
-          try {
-            const sourceData = file.type === 'application/gpx+xml'
-              ? togeojson.gpx(new DOMParser().parseFromString(evnt.target.result))
-              : JSON.parse(evnt.target.result);
+  const handleUpload = event => {
+    const input = event.target;
+    [...input.files].forEach(file => {
+      file.text()
+        .then(text => {
+          const { name, lines } = parseTrack(text, file.name);
+          if (!lines.length) { throw new Error(`No line to draw in ${file.name}`); }
+          setTracks(prevTracks => [...prevTracks, {
+            id: crypto.randomUUID(),
+            name,
+            color: pickShareColor(getUsedColors(prevTracks)),
+            disabled: false,
+            lines,
+          }]);
+        })
+        // eslint-disable-next-line no-console
+        .catch(error => console.error(error));
+    });
+    // Lets the same file be added again
+    input.value = '';
+  };
 
-            setRoutes(prevRoutes => [...prevRoutes, sourceData]);
-          } catch (err) {
-            // eslint-disable-next-line no-console
-            console.error(err);
-          }
-        };
-        reader.readAsText(file);
-      }
-    },
-    [],
-  );
+  const handleTrackChange = (id, changes) => {
+    setTracks(prevTracks => prevTracks.map(
+      track => (track.id === id ? { ...track, ...changes } : track),
+    ));
+  };
+
+  const handleTracksToggle = (ids, enabled) => {
+    setTracks(prevTracks => prevTracks.map(track => (ids.includes(track.id)
+      ? { ...track, disabled: !enabled }
+      : track)));
+  };
 
   const handleSharesToggle = React.useCallback(
     (ids, enabled) => {
@@ -219,37 +250,50 @@ const Home = () => {
     setIsDialogOpen(true);
   };
 
+  const offerUndo = (message, undo) => {
+    setUndoable({ message, undo });
+    setIsUndoShown(true);
+  };
+
   // Removes the share with its alias and color: until undone, the person
   // color moves to their next share, if any
   const handleShareDelete = id => {
-    setUndoable({ message: 'Compte supprimé', shares });
-    setIsUndoShown(true);
+    const previousShares = shares;
+    offerUndo('Compte supprimé', () => setShares(previousShares));
     setShares(({ [id]: deleted, ...prevShares }) => prevShares);
+  };
+
+  const handleTrackDelete = id => {
+    const previousTracks = tracks;
+    offerUndo('Trace supprimée', () => setTracks(previousTracks));
+    setTracks(prevTracks => prevTracks.filter(track => track.id !== id));
+  };
+
+  const handleTrackFit = id => {
+    const { lines } = tracks.find(track => track.id === id);
+    map?.fitBounds(getTrackBounds(lines), { padding: 60, maxZoom: 15 });
   };
 
   // Back to the palette, by position in the list
   const handleColorsReset = () => {
-    setUndoable({ message: 'Couleurs réinitialisées', shares });
-    setIsUndoShown(true);
+    const previousShares = shares;
+    offerUndo('Couleurs réinitialisées', () => setShares(previousShares));
     setShares(prevShares => Object.fromEntries(
       Object.entries(prevShares).map(([id, { color, ...share }]) => [id, share]),
     ));
   };
 
-  const handleShareSubmit = React.useCallback(
-    ({ id, alias }) => {
-      setShares(prevShares => {
-        const share = prevShares[id]
-          ?? { disabled: false, color: pickShareColor(Object.values(colorByShare)) };
-        // Emptied when editing, the alias falls back to the Statshunters name;
-        // adding an existing share again keeps it
-        const newAlias = alias || (dialogShare ? undefined : share.alias);
-        return { ...prevShares, [id]: { ...share, alias: newAlias } };
-      });
-      setIsDialogOpen(false);
-    },
-    [setShares, dialogShare, colorByShare],
-  );
+  const handleShareSubmit = ({ id, alias }) => {
+    setShares(prevShares => {
+      const share = prevShares[id]
+        ?? { disabled: false, color: pickShareColor(getUsedColors(tracks)) };
+      // Emptied when editing, the alias falls back to the Statshunters name;
+      // adding an existing share again keeps it
+      const newAlias = alias || (dialogShare ? undefined : share.alias);
+      return { ...prevShares, [id]: { ...share, alias: newAlias } };
+    });
+    setIsDialogOpen(false);
+  };
 
   // The color belongs to the person: it is stored on their first share
   const handleColorChange = React.useCallback(
@@ -268,7 +312,7 @@ const Home = () => {
       <GlobalStyles styles={globalStyles} />
       <Box sx={wrapperSx}>
         <MainMap
-          routes={routes}
+          tracks={tracks}
           colorMode={colorMode}
           countActivities={countActivities}
           onCountActivitiesToggle={() => setCountActivities(previous => !previous)}
@@ -412,6 +456,59 @@ const Home = () => {
               )}
             </Stack>
 
+            {tracks.length > 0 && (
+              <Stack sx={{ mb: 1 }}>
+                <Box component="small" sx={{ color: 'text.secondary', pl: 1 }}>Traces</Box>
+                {tracks.map(({
+                  id,
+                  name,
+                  color,
+                  disabled,
+                }) => (
+                  <Stack
+                    key={id}
+                    direction="row"
+                    alignItems="center"
+                    onContextMenu={event => {
+                      event.preventDefault();
+                      setTrackMenu({ id, x: event.clientX, y: event.clientY });
+                    }}
+                  >
+                    <Switch
+                      size="small"
+                      inputProps={{ id: `track-${id}` }}
+                      checked={!disabled}
+                      onChange={(event, checked) => handleTracksToggle([id], checked)}
+                    />
+                    <Box
+                      component="input"
+                      type="color"
+                      value={color}
+                      title="Changer la couleur"
+                      aria-label={`Couleur de ${name}`}
+                      onChange={event => handleTrackChange(id, { color: event.target.value })}
+                      sx={colorInputSx}
+                    />
+                    <Box component="label" htmlFor={`track-${id}`} title={name} sx={trackNameSx}>
+                      {name}
+                    </Box>
+                    <IconButton
+                      size="small"
+                      title="Actions de la trace"
+                      aria-label={`Actions de ${name}`}
+                      onClick={event => {
+                        const { left, bottom } = event.currentTarget.getBoundingClientRect();
+                        setTrackMenu({ id, x: left, y: bottom });
+                      }}
+                      sx={{ ml: 0.5, color: 'text.disabled' }}
+                    >
+                      <MoreVert sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+
             {colorMode === 'count' && !countActivities && activePersonCount > 0 && (
               <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1, pl: 1 }}>
                 <small>Possédé par</small>
@@ -484,6 +581,27 @@ const Home = () => {
             onColorsReset={handleColorsReset}
           />
 
+          <TrackContextMenu
+            position={trackMenu}
+            onClose={() => setTrackMenu()}
+            onFit={() => handleTrackFit(trackMenu.id)}
+            onRename={() => {
+              setDialogTrack(tracks.find(track => track.id === trackMenu.id));
+              setIsTrackDialogOpen(true);
+            }}
+            onDelete={() => handleTrackDelete(trackMenu.id)}
+          />
+
+          <TrackDialog
+            open={isTrackDialogOpen}
+            track={dialogTrack}
+            onClose={() => setIsTrackDialogOpen(false)}
+            onSubmit={name => {
+              handleTrackChange(dialogTrack.id, { name });
+              setIsTrackDialogOpen(false);
+            }}
+          />
+
           <Snackbar
             open={isUndoShown}
             autoHideDuration={6000}
@@ -498,7 +616,7 @@ const Home = () => {
                 color="inherit"
                 size="small"
                 onClick={() => {
-                  setShares(undoable.shares);
+                  undoable.undo();
                   setIsUndoShown(false);
                 }}
               >
@@ -540,14 +658,6 @@ const Home = () => {
               }}
               onChange={handleUpload}
             />
-          </Fab>
-
-          <Fab
-            color="primary"
-            size="small"
-            onClick={() => setRoutes([])}
-          >
-            <Clear />
           </Fab>
         </Stack>
       </Box>
