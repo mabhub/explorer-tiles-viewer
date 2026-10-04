@@ -16,6 +16,7 @@ import {
 } from '@mui/icons-material';
 
 import basemaps from '../basemaps';
+import usePassThroughMenu from '../hooks/use-pass-through-menu';
 
 const maxAreaLabels = {
   square: 'Max square',
@@ -50,10 +51,23 @@ const MapContextMenu = ({
     setBasemapsAnchor(null);
     onClose();
   };
+  // Pressing its submenu leaves the menu open, the other way round closes it
+  const menuProps = usePassThroughMenu({
+    open: Boolean(position),
+    onClose: close,
+    name: 'map',
+    inside: ['map', 'basemaps'],
+  });
+  const basemapsMenuProps = usePassThroughMenu({
+    open: Boolean(basemapsAnchor),
+    onClose: () => setBasemapsAnchor(null),
+    name: 'basemaps',
+  });
 
   return (
     <>
       <Menu
+        {...menuProps}
         open={Boolean(position)}
         onClose={close}
         anchorReference="anchorPosition"
@@ -114,6 +128,7 @@ const MapContextMenu = ({
       </Menu>
 
       <Menu
+        {...basemapsMenuProps}
         open={Boolean(basemapsAnchor)}
         anchorEl={basemapsAnchor}
         onClose={() => setBasemapsAnchor(null)}
