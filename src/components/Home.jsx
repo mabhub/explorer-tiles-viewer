@@ -1,11 +1,13 @@
 import React from 'react';
 import {
   Box,
+  Button,
   CircularProgress,
   Fab,
   GlobalStyles,
   IconButton,
   Paper,
+  Snackbar,
   Stack,
   Switch,
   ToggleButton,
@@ -14,7 +16,6 @@ import {
 import {
   ChevronLeft,
   Clear,
-  Edit,
   ErrorOutline,
   MoreVert,
   People,
@@ -25,6 +26,7 @@ import { DOMParser } from 'xmldom';
 import useLocalStorageState from 'use-local-storage-state';
 
 import MainMap from './MainMap';
+import ShareContextMenu from './ShareContextMenu';
 import ShareDialog from './ShareDialog';
 import useActivities, { getPersonByShare } from '../hooks/use-activities';
 import useShareAccounts, { getAccountName } from '../hooks/use-share-accounts';
@@ -75,10 +77,17 @@ const sharedSwatchBackground = count => (count > 2
   ? `linear-gradient(to right, ${sharedColors.fewest}, ${sharedColors.all})`
   : sharedColors.all);
 
-// The same person can have several shares: the id tells them apart
-const ShareName = ({ id, alias, account }) => {
+// The same person can have several shares: the id tells them apart, unless
+// hidden. Without a name, the id is all there is to show.
+const ShareName = ({
+  id,
+  alias,
+  account,
+  hideId,
+}) => {
   const name = alias || getAccountName(account);
   if (!name) { return id; }
+  if (hideId) { return name; }
 
   return (
     <>
@@ -101,6 +110,13 @@ const Home = () => {
   const [contextMenuPosition, setContextMenuPosition] = React.useState();
   // Share edited in the dialog, none when adding one
   const [dialogShare, setDialogShare] = React.useState();
+  // Account whose context menu is open, and where: { id, x, y }
+  const [shareMenu, setShareMenu] = React.useState();
+  const [hideShareIds, setHideShareIds] = useLocalStorageState('hideShareIds', { defaultValue: false });
+  // Last deletion or color reset, undoable for a few seconds: { message, shares }.
+  // Kept while the snackbar fades out.
+  const [undoable, setUndoable] = React.useState();
+  const [isUndoShown, setIsUndoShown] = React.useState(false);
 
   const shareIdList = Object.keys(shares);
   // Same queries as the map: React Query shares them, nothing is fetched twice
@@ -185,6 +201,23 @@ const Home = () => {
   const openShareDialog = share => {
     setDialogShare(share);
     setIsDialogOpen(true);
+  };
+
+  // Removes the share with its alias and color: until undone, the person
+  // color moves to their next share, if any
+  const handleShareDelete = id => {
+    setUndoable({ message: 'Compte supprimé', shares });
+    setIsUndoShown(true);
+    setShares(({ [id]: deleted, ...prevShares }) => prevShares);
+  };
+
+  // Back to the palette, by position in the list
+  const handleColorsReset = () => {
+    setUndoable({ message: 'Couleurs réinitialisées', shares });
+    setIsUndoShown(true);
+    setShares(prevShares => Object.fromEntries(
+      Object.entries(prevShares).map(([id, { color, ...share }]) => [id, share]),
+    ));
   };
 
   const handleShareSubmit = React.useCallback(
@@ -288,7 +321,15 @@ const Home = () => {
                 nested in it, they would leak into the switch accessible name */}
             <Stack sx={{ mb: 1 }}>
               {Object.entries(shares).map(([id, { disabled, alias }], index) => (
-                <Stack key={id} direction="row" alignItems="center">
+                <Stack
+                  key={id}
+                  direction="row"
+                  alignItems="center"
+                  onContextMenu={event => {
+                    event.preventDefault();
+                    setShareMenu({ id, x: event.clientX, y: event.clientY });
+                  }}
+                >
                   <Switch
                     size="small"
                     inputProps={{ id }}
@@ -301,26 +342,30 @@ const Home = () => {
                       type="color"
                       value={colorByShare[id]}
                       title="Changer la couleur"
-                      aria-label={`Couleur de ${id}`}
+                      aria-label={`Couleur de ${getShareLabel(id)}`}
                       onChange={event => handleColorChange(id, event.target.value)}
                       sx={colorInputSx}
                     />
                   )}
                   <Box component="label" htmlFor={id} sx={{ cursor: 'pointer' }}>
-                    <ShareName id={id} alias={alias} account={shareAccounts[index]?.data} />
+                    <ShareName
+                      id={id}
+                      alias={alias}
+                      account={shareAccounts[index]?.data}
+                      hideId={hideShareIds}
+                    />
                   </Box>
                   <IconButton
                     size="small"
-                    title="Modifier le nom affiché"
-                    aria-label={`Modifier ${id}`}
-                    onClick={() => openShareDialog({
-                      id,
-                      alias,
-                      accountName: getAccountName(shareAccounts[index]?.data),
-                    })}
+                    title="Actions du compte"
+                    aria-label={`Actions de ${getShareLabel(id)}`}
+                    onClick={event => {
+                      const { left, bottom } = event.currentTarget.getBoundingClientRect();
+                      setShareMenu({ id, x: left, y: bottom });
+                    }}
                     sx={{ ml: 0.5, color: 'text.disabled' }}
                   >
-                    <Edit sx={{ fontSize: 14 }} />
+                    <MoreVert sx={{ fontSize: 16 }} />
                   </IconButton>
                   {shareQueries[index]?.isLoading && (
                     <CircularProgress size={12} sx={{ ml: 1 }} />
@@ -399,6 +444,45 @@ const Home = () => {
               </Stack>
             )}
           </Paper>
+
+          <ShareContextMenu
+            shareId={shareMenu?.id}
+            position={shareMenu}
+            onClose={() => setShareMenu()}
+            onEdit={() => openShareDialog({
+              id: shareMenu.id,
+              alias: shares[shareMenu.id]?.alias,
+              accountName: getAccountName(accountByShare[shareMenu.id]),
+            })}
+            onDelete={() => handleShareDelete(shareMenu.id)}
+            hideShareIds={hideShareIds}
+            onHideShareIdsToggle={() => setHideShareIds(previous => !previous)}
+            canResetColors={colorMode === 'owner'}
+            onColorsReset={handleColorsReset}
+          />
+
+          <Snackbar
+            open={isUndoShown}
+            autoHideDuration={6000}
+            onClose={(event, reason) => {
+              // Map clicks would hide it before it can be undone
+              if (reason !== 'clickaway') { setIsUndoShown(false); }
+            }}
+            TransitionProps={{ onExited: () => setUndoable() }}
+            message={undoable?.message}
+            action={(
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => {
+                  setShares(undoable.shares);
+                  setIsUndoShown(false);
+                }}
+              >
+                Annuler
+              </Button>
+            )}
+          />
 
           <ShareDialog
             open={isDialogOpen}
