@@ -3,8 +3,6 @@ import {
   Box,
   CircularProgress,
   Fab,
-  FormControlLabel,
-  FormGroup,
   GlobalStyles,
   IconButton,
   Paper,
@@ -212,71 +210,60 @@ const Home = () => {
               <ToggleButton value="owner">Compte</ToggleButton>
             </ToggleButtonGroup>
 
-            <FormGroup sx={{ mb: 1, pl: 1 }}>
+            {/* Controls are siblings of the label, which only holds the name:
+                nested in it, they would leak into the switch accessible name */}
+            <Stack sx={{ mb: 1 }}>
               {Object.entries(shares).map(([id, { disabled, alias }], index) => (
-                <FormControlLabel
-                  label={(
-                    <>
-                      {colorMode === 'owner' && (
-                        <Box
-                          component="input"
-                          type="color"
-                          value={colorByShare[id]}
-                          title="Changer la couleur"
-                          aria-label={`Couleur de ${id}`}
-                          onChange={event => handleColorChange(id, event.target.value)}
-                          sx={colorInputSx}
-                        />
-                      )}
-                      <ShareName id={id} alias={alias} account={shareAccounts[index]?.data} />
-                      <IconButton
-                        size="small"
-                        title="Modifier le nom affiché"
-                        aria-label={`Modifier ${id}`}
-                        onClick={event => {
-                          // Inside the label: do not toggle the share
-                          event.preventDefault();
-                          openShareDialog({
-                            id,
-                            alias,
-                            accountName: getAccountName(shareAccounts[index]?.data),
-                          });
-                        }}
-                        sx={{ ml: 0.5, color: 'text.disabled' }}
-                      >
-                        <Edit sx={{ fontSize: 14 }} />
-                      </IconButton>
-                      {shareQueries[index]?.isLoading && (
-                        <CircularProgress size={12} sx={{ ml: 1, verticalAlign: 'middle' }} />
-                      )}
-                      {shareQueries[index]?.isError && (
-                        <IconButton
-                          size="small"
-                          color="error"
-                          title="Échec du chargement, réessayer"
-                          onClick={event => {
-                            // Inside the label: do not toggle the share
-                            event.preventDefault();
-                            shareQueries[index].refetch();
-                          }}
-                        >
-                          <ErrorOutline fontSize="inherit" />
-                        </IconButton>
-                      )}
-                    </>
-                  )}
-                  key={id}
-                  control={(
-                    <Switch
-                      size="small"
-                      inputProps={{ id }}
-                      checked={disabled !== true}
-                      onChange={handleShareClick}
+                <Stack key={id} direction="row" alignItems="center">
+                  <Switch
+                    size="small"
+                    inputProps={{ id }}
+                    checked={disabled !== true}
+                    onChange={handleShareClick}
+                  />
+                  {colorMode === 'owner' && (
+                    <Box
+                      component="input"
+                      type="color"
+                      value={colorByShare[id]}
+                      title="Changer la couleur"
+                      aria-label={`Couleur de ${id}`}
+                      onChange={event => handleColorChange(id, event.target.value)}
+                      sx={colorInputSx}
                     />
                   )}
-                />
+                  <Box component="label" htmlFor={id} sx={{ cursor: 'pointer' }}>
+                    <ShareName id={id} alias={alias} account={shareAccounts[index]?.data} />
+                  </Box>
+                  <IconButton
+                    size="small"
+                    title="Modifier le nom affiché"
+                    aria-label={`Modifier ${id}`}
+                    onClick={() => openShareDialog({
+                      id,
+                      alias,
+                      accountName: getAccountName(shareAccounts[index]?.data),
+                    })}
+                    sx={{ ml: 0.5, color: 'text.disabled' }}
+                  >
+                    <Edit sx={{ fontSize: 14 }} />
+                  </IconButton>
+                  {shareQueries[index]?.isLoading && (
+                    <CircularProgress size={12} sx={{ ml: 1 }} />
+                  )}
+                  {shareQueries[index]?.isError && (
+                    <IconButton
+                      size="small"
+                      color="error"
+                      title="Échec du chargement, réessayer"
+                      onClick={() => shareQueries[index].refetch()}
+                    >
+                      <ErrorOutline fontSize="inherit" />
+                    </IconButton>
+                  )}
+                </Stack>
               ))}
-            </FormGroup>
+            </Stack>
 
             <IconButton
               size="small"
