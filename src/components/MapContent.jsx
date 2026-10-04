@@ -36,6 +36,7 @@ const MapContent = ({
   routes = [],
   colorMode,
   activePersonCount,
+  maxAreas,
 }) => (
   <>
     <Source
@@ -61,6 +62,14 @@ const MapContent = ({
         }}
         key={`${gridBefore}fill`}
         beforeId={gridBefore}
+      />
+    </Source>
+
+    <Source id="max-areas" type="geojson" data={maxAreas}>
+      <Layer
+        id="max-areas"
+        type="line"
+        paint={{ 'line-color': ['get', 'color'], 'line-width': 3 }}
       />
     </Source>
 

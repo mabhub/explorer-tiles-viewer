@@ -1,13 +1,26 @@
 import React from 'react';
 import {
+  Divider,
   ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
 } from '@mui/material';
-import { Check, ChevronRight, Layers } from '@mui/icons-material';
+import {
+  Check,
+  CheckBox,
+  CheckBoxOutlineBlank,
+  ChevronRight,
+  Layers,
+} from '@mui/icons-material';
 
 import basemaps from '../basemaps';
+
+const maxAreaLabels = {
+  square: 'Max square',
+  line: 'Max line',
+  column: 'Max column',
+};
 
 const submenuOrigins = {
   anchorOrigin: { vertical: 'top', horizontal: 'right' },
@@ -20,6 +33,9 @@ const MapContextMenu = ({
   onClose,
   basemapId,
   onBasemapChange,
+  maxAreas,
+  onMaxAreaToggle,
+  canShowMaxAreas,
 }) => {
   const [basemapsAnchor, setBasemapsAnchor] = React.useState(null);
 
@@ -41,6 +57,24 @@ const MapContextMenu = ({
           <ListItemText>Fond de carte</ListItemText>
           <ChevronRight fontSize="small" sx={{ ml: 2 }} />
         </MenuItem>
+        <Divider />
+        {Object.entries(maxAreaLabels).map(([kind, label]) => (
+          // Left open, to toggle several areas in a row
+          <MenuItem
+            key={kind}
+            role="menuitemcheckbox"
+            aria-checked={Boolean(maxAreas[kind])}
+            disabled={!canShowMaxAreas}
+            onClick={() => onMaxAreaToggle(kind)}
+          >
+            <ListItemIcon>
+              {maxAreas[kind] ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
+            </ListItemIcon>
+            <ListItemText secondary={canShowMaxAreas ? undefined : 'Mode Compte uniquement'}>
+              {label}
+            </ListItemText>
+          </MenuItem>
+        ))}
       </Menu>
 
       <Menu

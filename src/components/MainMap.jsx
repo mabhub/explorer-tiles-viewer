@@ -14,6 +14,12 @@ import { tile2lat, tile2long } from '../lib';
 import Cadastre from './Cadastre';
 import MapContextMenu from './MapContextMenu';
 import TilePopup from './TilePopup';
+import {
+  getMaxColumn,
+  getMaxLine,
+  getMaxSquare,
+  toPolygon,
+} from '../max-areas';
 import { defaultBasemap, getBasemap } from '../basemaps';
 
 const protocol = new pmtiles.Protocol();
@@ -21,6 +27,8 @@ MapLibreGL.addProtocol('pmtiles', protocol.tile);
 const initialViewState = { longitude: 1.4, latitude: 43.6, zoom: 11 };
 const mapStyle = { width: '100%', minHeight: 100, height: '100%' };
 const interactiveLayerIds = ['tiles'];
+const noMaxAreas = { square: false, line: false, column: false };
+const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxColumn };
 
 const MainMap = ({
   routes = [],
@@ -36,6 +44,7 @@ const MainMap = ({
   const [basemapId, setBasemapId] = useLocalStorageState('basemap', { defaultValue: defaultBasemap.id });
   const basemap = getBasemap(basemapId);
   const [contextMenuPosition, setContextMenuPosition] = React.useState();
+  const [maxAreas, setMaxAreas] = useLocalStorageState('maxAreas', { defaultValue: noMaxAreas });
   const [activeTile, setActiveTile] = React.useState();
   const [cadastre] = React.useState(false);
   const [shares] = useShares();
@@ -79,6 +88,40 @@ const MainMap = ({
       return store;
     },
     [allActivitiesQueries, shares],
+  );
+
+  // Max square, line and column of each person (all their active shares
+  // together), drawn in the owner coloring mode only
+  const maxAreaFeatures = React.useMemo(
+    () => {
+      const kinds = Object.keys(maxAreaGetters).filter(kind => maxAreas[kind]);
+      if (colorMode !== 'owner' || !kinds.length) {
+        return { type: 'FeatureCollection', features: [] };
+      }
+
+      const people = {};
+      allActivitiesQueries.forEach(({ data: [id, activities] = [], status }) => {
+        if (status !== 'success' || !isShareActive(shares[id])) { return; }
+        activities.forEach(({ user_id: userId, tiles }) => {
+          // A plain object: Map is the map component in this module
+          if (!people[userId]) { people[userId] = { shareId: id, tiles: {} }; }
+          tiles.forEach(({ x, y }) => { people[userId].tiles[`${x}/${y}`] = [x, y]; });
+        });
+      });
+
+      return {
+        type: 'FeatureCollection',
+        features: Object.values(people).flatMap(({ shareId, tiles }) => kinds
+          .map(kind => maxAreaGetters[kind](Object.values(tiles)))
+          .filter(Boolean)
+          .map(area => ({
+            type: 'Feature',
+            geometry: toPolygon(area),
+            properties: { color: colorByShare[shareId] },
+          }))),
+      };
+    },
+    [allActivitiesQueries, shares, maxAreas, colorMode, colorByShare],
   );
 
   // Bumped each time the grid source is (re)created: a basemap change replaces
@@ -206,6 +249,7 @@ const MainMap = ({
         routes={routes}
         colorMode={colorMode}
         activePersonCount={activePersonCount}
+        maxAreas={maxAreaFeatures}
       />
       {activeTileData && (
         <Popup
@@ -232,6 +276,9 @@ const MainMap = ({
         onClose={() => setContextMenuPosition()}
         basemapId={basemap.id}
         onBasemapChange={handleBasemapChange}
+        maxAreas={maxAreas}
+        onMaxAreaToggle={kind => setMaxAreas(previous => ({ ...previous, [kind]: !previous[kind] }))}
+        canShowMaxAreas={colorMode === 'owner'}
       />
     </Map>
   );
