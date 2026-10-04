@@ -110,6 +110,15 @@ const Home = () => {
     [shares, shareQueries],
   );
 
+  // Displayed name of each person, the one of their first share
+  const accountByShare = Object.fromEntries(
+    shareIdList.map((id, index) => [id, shareAccounts[index]?.data]),
+  );
+  const getShareLabel = id => shares[id]?.alias || getAccountName(accountByShare[id]) || id;
+  const labelByShare = Object.fromEntries(
+    shareIdList.map(id => [id, getShareLabel(firstShareByShare[id])]),
+  );
+
   const handleColorModeChange = React.useCallback(
     (event, mode) => {
       // An exclusive group reports null when the selected button is clicked again
@@ -192,6 +201,7 @@ const Home = () => {
           colorMode={colorMode}
           colorByShare={colorByShare}
           activePersonCount={activePersonCount}
+          labelByShare={labelByShare}
         />
         <Stack
           spacing={1}

@@ -13,6 +13,7 @@ import MapContent, { gridFeature } from './MapContent';
 import { tile2lat, tile2long } from '../lib';
 import Cadastre from './Cadastre';
 import MapContextMenu from './MapContextMenu';
+import TilePopup from './TilePopup';
 import { defaultBasemap, getBasemap } from '../basemaps';
 
 const protocol = new pmtiles.Protocol();
@@ -26,6 +27,7 @@ const MainMap = ({
   colorMode,
   colorByShare,
   activePersonCount,
+  labelByShare,
 }) => {
   const mapRef = React.useRef();
   // Labels of the basemap (vector ones only) to keep above the grid, looked up
@@ -48,15 +50,21 @@ const MainMap = ({
       allActivitiesQueries.forEach(({ data: [id, activities] = [], status }) => {
         if (status !== 'success' || !isShareActive(shares[id])) { return; }
 
-        activities.forEach(({ user_id: userId, tiles }) => {
+        activities.forEach(activity => {
+          const { user_id: userId, tiles } = activity;
           tiles.forEach(({ x, y }) => {
             const key = `14/${x}/${y}`;
             if (!store[key]) {
-              store[key] = { users: [], shares: [], activityCount: 0, userCount: 0 };
+              store[key] = {
+                users: [],
+                shares: [],
+                activities: [],
+                userCount: 0,
+              };
             }
             const tile = store[key];
 
-            tile.activityCount += 1;
+            tile.activities.push({ activity, shareId: id });
             if (!tile.users.includes(userId)) {
               tile.users.push(userId);
               tile.userCount = tile.users.length;
@@ -179,13 +187,6 @@ const MainMap = ({
     [activeTile, activeTileData],
   );
 
-  const popupContent = React.useMemo(
-    () => {
-      if (!activeTileData) { return ''; }
-      return JSON.stringify(activeTileData, null, 2);
-    },
-    [activeTileData],
-  );
   return (
     <Map
       initialViewState={initialViewState}
@@ -216,8 +217,14 @@ const MainMap = ({
           }}
           closeOnClick={false}
           anchor="bottom-right"
+          maxWidth="360px"
         >
-          <pre>{popupContent}</pre>
+          <TilePopup
+            key={activeTile.id}
+            tile={activeTileData}
+            labelByShare={labelByShare}
+            colorByShare={colorByShare}
+          />
         </Popup>
       )}
       <MapContextMenu
