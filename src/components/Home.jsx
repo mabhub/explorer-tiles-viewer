@@ -270,6 +270,11 @@ const Home = () => {
             left: '1rem',
             top: '1rem',
             maxWidth: 'calc(100% - 2rem)',
+            // The empty area between and around the controls lets the map
+            // get drags and right clicks. pointer-events is inherited: the
+            // controls take them back.
+            pointerEvents: 'none',
+            '& > *': { pointerEvents: 'auto' },
           }}
         >
           {isPanelCollapsed && (
@@ -507,7 +512,14 @@ const Home = () => {
               accept=".geojson,.json,application/json,application/geojson,.gpx"
               type="file"
               id="upload"
-              sx={{ opacity: 0, position: 'absolute' }}
+              // Sized to the button: wider by default, it would catch the
+              // clicks meant for the map beside it
+              sx={{
+                opacity: 0,
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+              }}
               onChange={handleUpload}
             />
           </Fab>
