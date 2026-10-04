@@ -41,6 +41,8 @@ const MainMap = ({
   contextMenuPosition,
   onContextMenuPositionChange,
   onShareAdd,
+  shareItems,
+  onSharesToggle,
 }) => {
   const mapRef = React.useRef();
   // Labels of the basemap (vector ones only) to keep above the grid, looked up
@@ -314,6 +316,8 @@ const MainMap = ({
         onCountActivitiesToggle={onCountActivitiesToggle}
         canCountActivities={colorMode === 'count'}
         onShareAdd={onShareAdd}
+        shareItems={shareItems}
+        onSharesToggle={onSharesToggle}
       />
     </Map>
   );

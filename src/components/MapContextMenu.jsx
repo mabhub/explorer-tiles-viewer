@@ -12,6 +12,7 @@ import {
   CheckBoxOutlineBlank,
   ChevronRight,
   Layers,
+  People,
   PersonAdd,
 } from '@mui/icons-material';
 
@@ -44,25 +45,36 @@ const MapContextMenu = ({
   onCountActivitiesToggle,
   canCountActivities,
   onShareAdd,
+  shareItems,
+  onSharesToggle,
 }) => {
   const [basemapsAnchor, setBasemapsAnchor] = React.useState(null);
+  const [accountsAnchor, setAccountsAnchor] = React.useState(null);
 
   const close = () => {
     setBasemapsAnchor(null);
+    setAccountsAnchor(null);
     onClose();
   };
-  // Pressing its submenu leaves the menu open, the other way round closes it
+  // Pressing a submenu leaves the menu open, the other way round closes it
   const menuProps = usePassThroughMenu({
     open: Boolean(position),
     onClose: close,
     name: 'map',
-    inside: ['map', 'basemaps'],
+    inside: ['map', 'basemaps', 'accounts'],
   });
   const basemapsMenuProps = usePassThroughMenu({
     open: Boolean(basemapsAnchor),
     onClose: () => setBasemapsAnchor(null),
     name: 'basemaps',
   });
+  const accountsMenuProps = usePassThroughMenu({
+    open: Boolean(accountsAnchor),
+    onClose: () => setAccountsAnchor(null),
+    name: 'accounts',
+  });
+
+  const allShareIds = shareItems.map(({ id }) => id);
 
   return (
     <>
@@ -81,6 +93,14 @@ const MapContextMenu = ({
         >
           <ListItemIcon><PersonAdd fontSize="small" /></ListItemIcon>
           <ListItemText>Ajouter un compte…</ListItemText>
+        </MenuItem>
+        <MenuItem
+          disabled={!shareItems.length}
+          onClick={event => setAccountsAnchor(event.currentTarget)}
+        >
+          <ListItemIcon><People fontSize="small" /></ListItemIcon>
+          <ListItemText>Comptes</ListItemText>
+          <ChevronRight fontSize="small" sx={{ ml: 2 }} />
         </MenuItem>
         <Divider />
         <MenuItem onClick={event => setBasemapsAnchor(event.currentTarget)}>
@@ -145,6 +165,47 @@ const MapContextMenu = ({
           >
             <ListItemIcon>{id === basemapId && <Check fontSize="small" />}</ListItemIcon>
             <ListItemText>{label}</ListItemText>
+          </MenuItem>
+        ))}
+      </Menu>
+
+      {/* Left open, to toggle several accounts in a row */}
+      <Menu
+        {...accountsMenuProps}
+        open={Boolean(accountsAnchor)}
+        anchorEl={accountsAnchor}
+        onClose={() => setAccountsAnchor(null)}
+        {...submenuOrigins}
+      >
+        <MenuItem
+          disabled={shareItems.every(({ enabled }) => enabled)}
+          onClick={() => onSharesToggle(allShareIds, true)}
+        >
+          <ListItemText inset>Tout activer</ListItemText>
+        </MenuItem>
+        <MenuItem
+          disabled={!shareItems.some(({ enabled }) => enabled)}
+          onClick={() => onSharesToggle(allShareIds, false)}
+        >
+          <ListItemText inset>Tout désactiver</ListItemText>
+        </MenuItem>
+        <Divider />
+        {shareItems.map(({
+          id,
+          label,
+          detail,
+          enabled,
+        }) => (
+          <MenuItem
+            key={id}
+            role="menuitemcheckbox"
+            aria-checked={enabled}
+            onClick={() => onSharesToggle([id], !enabled)}
+          >
+            <ListItemIcon>
+              {enabled ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
+            </ListItemIcon>
+            <ListItemText secondary={detail}>{label}</ListItemText>
           </MenuItem>
         ))}
       </Menu>

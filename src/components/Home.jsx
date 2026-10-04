@@ -188,15 +188,31 @@ const Home = () => {
     [],
   );
 
-  const handleShareClick = React.useCallback(
-    ({ target: { id } = {} }, checked) => {
+  const handleSharesToggle = React.useCallback(
+    (ids, enabled) => {
       setShares(prevShares => ({
         ...prevShares,
-        [id]: { ...prevShares[id], disabled: !checked },
+        ...Object.fromEntries(ids.map(id => [id, { ...prevShares[id], disabled: !enabled }])),
       }));
     },
     [setShares],
   );
+
+  const handleShareClick = React.useCallback(
+    ({ target: { id } = {} }, checked) => handleSharesToggle([id], checked),
+    [handleSharesToggle],
+  );
+
+  // Accounts as listed in the panel, for the map context menu
+  const shareItems = shareIdList.map((id, index) => {
+    const name = shares[id].alias || getAccountName(shareAccounts[index]?.data);
+    return {
+      id,
+      label: name || id,
+      detail: name && !hideShareIds ? id : undefined,
+      enabled: isShareActive(shares[id]),
+    };
+  });
 
   const openShareDialog = share => {
     setDialogShare(share);
@@ -262,6 +278,8 @@ const Home = () => {
           contextMenuPosition={contextMenuPosition}
           onContextMenuPositionChange={setContextMenuPosition}
           onShareAdd={() => openShareDialog()}
+          shareItems={shareItems}
+          onSharesToggle={handleSharesToggle}
         />
         <Stack
           spacing={1}
