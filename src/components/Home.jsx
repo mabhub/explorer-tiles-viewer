@@ -32,6 +32,8 @@ const swatchSx = {
   opacity: 0.5,
   verticalAlign: 'middle',
 };
+// A share link, with or without trailing slash or query string, or a bare id
+const shareIdPattern = /^(?:.*\/share\/)?(\w+)\/?(?:[?#].*)?$/;
 const sharedSwatchBackground = count => (count > 2
   ? `linear-gradient(to right, ${sharedColors.fewest}, ${sharedColors.all})`
   : sharedColors.all);
@@ -40,6 +42,7 @@ const Home = () => {
   const [routes, setRoutes] = React.useState([]);
   const [shares, setShares] = useShares();
   const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
+  const [isShareInvalid, setIsShareInvalid] = React.useState(false);
 
   const shareIdList = Object.keys(shares);
   const activeShareCount = Object.values(shares).filter(isShareActive).length;
@@ -96,7 +99,12 @@ const Home = () => {
       const formData = new FormData(event.target);
       const { newShare } = Object.fromEntries(formData.entries());
 
-      const id = newShare.split('/').filter(Boolean).pop();
+      const [, id] = newShare.trim().match(shareIdPattern) || [];
+      if (!id) {
+        setIsShareInvalid(true);
+        return;
+      }
+
       setShares(prevShares => (prevShares[id]
         ? prevShares
         : { ...prevShares, [id]: { disabled: false } }));
@@ -179,6 +187,9 @@ const Home = () => {
                 variant="filled"
                 label="Ajouter une grille"
                 placeholder="https://statshunters.com/share/abc…"
+                error={isShareInvalid}
+                helperText={isShareInvalid ? 'Lien de partage invalide' : undefined}
+                onChange={() => setIsShareInvalid(false)}
               />
             </form>
           </Paper>
