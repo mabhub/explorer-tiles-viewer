@@ -1,6 +1,11 @@
 // Count coloring mode: tiles owned by 1, 2, then 3 people or more
 export const countColors = ['green', 'orange', 'red'];
 
+// Its activities variant: activities on a tile (median 1, 99th percentile
+// about 30), by log-spaced steps starting at each threshold
+export const activityThresholds = [1, 2, 5, 10, 25, 100];
+export const activityColors = ['#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31a1c', '#b10026'];
+
 // Age coloring mode: year of the latest activity on a tile, from the current
 // year (most intense) to 5 years ago or more (gray, still visible)
 export const currentYear = new Date().getFullYear();

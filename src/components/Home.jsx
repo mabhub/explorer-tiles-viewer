@@ -30,6 +30,8 @@ import useActivities, { getPersonByShare } from '../hooks/use-activities';
 import useShareAccounts, { getAccountName } from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
 import {
+  activityColors,
+  activityThresholds,
   ageColors,
   countColors,
   currentYear,
@@ -63,6 +65,12 @@ const colorInputSx = {
   '&::-webkit-color-swatch': { border: 'none', borderRadius: '50%' },
   '&::-moz-color-swatch': { border: 'none', borderRadius: '50%' },
 };
+// "1", "2–4", …, "100 et +"
+const activityLabels = activityThresholds.map((threshold, index) => {
+  const next = activityThresholds[index + 1];
+  if (!next) { return `${threshold} et +`; }
+  return next - 1 > threshold ? `${threshold}–${next - 1}` : `${threshold}`;
+});
 const sharedSwatchBackground = count => (count > 2
   ? `linear-gradient(to right, ${sharedColors.fewest}, ${sharedColors.all})`
   : sharedColors.all);
@@ -85,6 +93,8 @@ const Home = () => {
   const [routes, setRoutes] = React.useState([]);
   const [shares, setShares] = useShares();
   const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
+  // Variant of the count coloring mode: activities instead of people
+  const [countActivities, setCountActivities] = useLocalStorageState('countActivities', { defaultValue: false });
   const [isPanelCollapsed, setIsPanelCollapsed] = useLocalStorageState('panelCollapsed', { defaultValue: false });
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   // The map context menu also opens from the panel, for touch screens
@@ -211,6 +221,8 @@ const Home = () => {
         <MainMap
           routes={routes}
           colorMode={colorMode}
+          countActivities={countActivities}
+          onCountActivitiesToggle={() => setCountActivities(previous => !previous)}
           colorByShare={colorByShare}
           activePersonCount={activePersonCount}
           labelByShare={labelByShare}
@@ -332,13 +344,25 @@ const Home = () => {
               )}
             </Stack>
 
-            {colorMode === 'count' && activePersonCount > 0 && (
+            {colorMode === 'count' && !countActivities && activePersonCount > 0 && (
               <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1, pl: 1 }}>
                 <small>Possédé par</small>
                 {countColors.map((color, index) => (
                   <Stack key={color} direction="row" alignItems="center" spacing={0.5}>
                     <Box component="span" sx={{ ...swatchSx, bgcolor: color }} />
                     <small>{index < countColors.length - 1 ? index + 1 : `${index + 1} et +`}</small>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+
+            {colorMode === 'count' && countActivities && activePersonCount > 0 && (
+              <Stack direction="row" alignItems="center" flexWrap="wrap" sx={{ mb: 1, pl: 1, columnGap: 1.5 }}>
+                <small>Activités</small>
+                {activityColors.map((color, index) => (
+                  <Stack key={color} direction="row" alignItems="center" spacing={0.5}>
+                    <Box component="span" sx={{ ...swatchSx, bgcolor: color }} />
+                    <small>{activityLabels[index]}</small>
                   </Stack>
                 ))}
               </Stack>

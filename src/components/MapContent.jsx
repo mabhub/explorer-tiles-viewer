@@ -2,6 +2,8 @@ import React from 'react';
 import { Layer, Source } from 'react-map-gl/maplibre';
 
 import {
+  activityColors,
+  activityThresholds,
   ageColors,
   countColors,
   currentYear,
@@ -45,7 +47,16 @@ const ageColor = [
   ],
 ];
 
-const fillColors = { count: countColor, age: ageColor };
+const activityColor = [
+  'case',
+  isUnvisited, '#fff0',
+  [
+    'step', ['number', ['feature-state', 'activities'], 0],
+    activityColors[0],
+    ...activityThresholds.slice(1)
+      .flatMap((threshold, index) => [threshold, activityColors[index + 1]]),
+  ],
+];
 
 const getOwnerColor = activePersonCount => [
   'case',
@@ -62,10 +73,17 @@ const getOwnerColor = activePersonCount => [
     : sharedColors.all,
 ];
 
+const getFillColor = (colorMode, countActivities, activePersonCount) => {
+  if (colorMode === 'owner') { return getOwnerColor(activePersonCount); }
+  if (colorMode === 'age') { return ageColor; }
+  return countActivities ? activityColor : countColor;
+};
+
 const MapContent = ({
   gridBefore,
   routes = [],
   colorMode,
+  countActivities,
   activePersonCount,
   maxAreas,
   showGrid,
@@ -83,9 +101,7 @@ const MapContent = ({
         source-layer={gridFeature.sourceLayer}
         paint={{
           'fill-outline-color': getOutlineColor(showGrid),
-          'fill-color': colorMode === 'owner'
-            ? getOwnerColor(activePersonCount)
-            : fillColors[colorMode] ?? countColor,
+          'fill-color': getFillColor(colorMode, countActivities, activePersonCount),
           'fill-opacity': [
             'case',
             ['==', ['feature-state', 'clicked'], true], 0.75,

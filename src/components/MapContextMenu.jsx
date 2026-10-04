@@ -39,6 +39,9 @@ const MapContextMenu = ({
   canShowMaxAreas,
   showGrid,
   onGridToggle,
+  countActivities,
+  onCountActivitiesToggle,
+  canCountActivities,
   onShareAdd,
 }) => {
   const [basemapsAnchor, setBasemapsAnchor] = React.useState(null);
@@ -78,6 +81,19 @@ const MapContextMenu = ({
           <ListItemText secondary="Masquée sous le zoom 10">Grille</ListItemText>
         </MenuItem>
         <Divider />
+        <MenuItem
+          role="menuitemcheckbox"
+          aria-checked={countActivities}
+          disabled={!canCountActivities}
+          onClick={onCountActivitiesToggle}
+        >
+          <ListItemIcon>
+            {countActivities ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
+          </ListItemIcon>
+          <ListItemText secondary={canCountActivities ? undefined : 'Mode Nombre uniquement'}>
+            Compter les activités
+          </ListItemText>
+        </MenuItem>
         {Object.entries(maxAreaLabels).map(([kind, label]) => (
           // Left open, to toggle several areas in a row
           <MenuItem

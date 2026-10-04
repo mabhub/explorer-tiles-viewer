@@ -33,6 +33,8 @@ const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxC
 const MainMap = ({
   routes = [],
   colorMode,
+  countActivities,
+  onCountActivitiesToggle,
   colorByShare,
   activePersonCount,
   labelByShare,
@@ -71,6 +73,7 @@ const MainMap = ({
                 users: [],
                 shares: [],
                 activities: [],
+                activityKeys: new Set(),
                 userCount: 0,
                 latestDate: '',
               };
@@ -78,6 +81,9 @@ const MainMap = ({
             const tile = store[key];
 
             tile.activities.push({ activity, shareId: id });
+            // Several shares of a person often include the same activity: it
+            // is counted once, as in the popup
+            tile.activityKeys.add(activity.foreignId ? `${userId}/${activity.foreignId}` : activity);
             // "YYYY-MM-DD hh:mm:ss" dates compare as strings
             if (activity.date > tile.latestDate) {
               tile.latestDate = activity.date;
@@ -149,11 +155,18 @@ const MainMap = ({
           map.removeFeatureState({ ...gridFeature, id }, 'count');
           map.removeFeatureState({ ...gridFeature, id }, 'color');
           map.removeFeatureState({ ...gridFeature, id }, 'year');
+          map.removeFeatureState({ ...gridFeature, id }, 'activities');
         }
       });
-      Object.entries(allTiles).forEach(([id, { userCount, shares: owners, latestDate }]) => {
+      Object.entries(allTiles).forEach(([id, {
+        userCount,
+        shares: owners,
+        latestDate,
+        activityKeys,
+      }]) => {
         map.setFeatureState({ ...gridFeature, id }, {
           count: userCount,
+          activities: activityKeys.size,
           // Color of the only owning person (all their shares share it), none
           // when several people own the tile
           color: userCount === 1 ? colorByShare[owners[0]] : null,
@@ -260,6 +273,7 @@ const MainMap = ({
         gridBefore={labelsLayer}
         routes={routes}
         colorMode={colorMode}
+        countActivities={countActivities}
         activePersonCount={activePersonCount}
         maxAreas={maxAreaFeatures}
         showGrid={showGrid}
@@ -296,6 +310,9 @@ const MainMap = ({
         canShowMaxAreas={colorMode === 'owner'}
         showGrid={showGrid}
         onGridToggle={() => setShowGrid(previous => !previous)}
+        countActivities={countActivities}
+        onCountActivitiesToggle={onCountActivitiesToggle}
+        canCountActivities={colorMode === 'count'}
         onShareAdd={onShareAdd}
       />
     </Map>
