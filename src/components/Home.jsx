@@ -16,6 +16,7 @@ import {
   Clear,
   Edit,
   ErrorOutline,
+  MoreVert,
   Upload,
 } from '@mui/icons-material';
 import togeojson from '@mapbox/togeojson';
@@ -82,6 +83,8 @@ const Home = () => {
   const [shares, setShares] = useShares();
   const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  // The map context menu also opens from the panel, for touch screens
+  const [contextMenuPosition, setContextMenuPosition] = React.useState();
   // Share edited in the dialog, none when adding one
   const [dialogShare, setDialogShare] = React.useState();
 
@@ -202,23 +205,37 @@ const Home = () => {
           colorByShare={colorByShare}
           activePersonCount={activePersonCount}
           labelByShare={labelByShare}
+          contextMenuPosition={contextMenuPosition}
+          onContextMenuPositionChange={setContextMenuPosition}
         />
         <Stack
           spacing={1}
           sx={{ position: 'absolute', left: '1rem', top: '1rem' }}
         >
           <Paper sx={{ p: 1 }}>
-            <ToggleButtonGroup
-              value={colorMode}
-              exclusive
-              fullWidth
-              size="small"
-              onChange={handleColorModeChange}
-              sx={{ mb: 1 }}
-            >
-              <ToggleButton value="count">Nombre</ToggleButton>
-              <ToggleButton value="owner">Compte</ToggleButton>
-            </ToggleButtonGroup>
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1 }}>
+              <ToggleButtonGroup
+                value={colorMode}
+                exclusive
+                fullWidth
+                size="small"
+                onChange={handleColorModeChange}
+              >
+                <ToggleButton value="count">Nombre</ToggleButton>
+                <ToggleButton value="owner">Compte</ToggleButton>
+              </ToggleButtonGroup>
+              <IconButton
+                size="small"
+                title="Options de la carte"
+                aria-label="Options de la carte"
+                onClick={event => {
+                  const { left, bottom } = event.currentTarget.getBoundingClientRect();
+                  setContextMenuPosition({ x: left, y: bottom });
+                }}
+              >
+                <MoreVert fontSize="small" />
+              </IconButton>
+            </Stack>
 
             {/* Controls are siblings of the label, which only holds the name:
                 nested in it, they would leak into the switch accessible name */}

@@ -36,6 +36,8 @@ const MainMap = ({
   colorByShare,
   activePersonCount,
   labelByShare,
+  contextMenuPosition,
+  onContextMenuPositionChange,
 }) => {
   const mapRef = React.useRef();
   // Labels of the basemap (vector ones only) to keep above the grid, looked up
@@ -43,7 +45,6 @@ const MainMap = ({
   const [labelsLayer, setLabelsLayer] = React.useState();
   const [basemapId, setBasemapId] = useLocalStorageState('basemap', { defaultValue: defaultBasemap.id });
   const basemap = getBasemap(basemapId);
-  const [contextMenuPosition, setContextMenuPosition] = React.useState();
   const [maxAreas, setMaxAreas] = useLocalStorageState('maxAreas', { defaultValue: noMaxAreas });
   const [showGrid, setShowGrid] = useLocalStorageState('showGrid', { defaultValue: true });
   const [activeTile, setActiveTile] = React.useState();
@@ -197,9 +198,9 @@ const MainMap = ({
   const handleContextMenu = React.useCallback(
     ({ originalEvent }) => {
       originalEvent.preventDefault();
-      setContextMenuPosition({ x: originalEvent.clientX, y: originalEvent.clientY });
+      onContextMenuPositionChange({ x: originalEvent.clientX, y: originalEvent.clientY });
     },
-    [],
+    [onContextMenuPositionChange],
   );
 
   const handleMapClick = React.useCallback(
@@ -277,7 +278,7 @@ const MainMap = ({
       )}
       <MapContextMenu
         position={contextMenuPosition}
-        onClose={() => setContextMenuPosition()}
+        onClose={() => onContextMenuPositionChange()}
         basemapId={basemap.id}
         onBasemapChange={handleBasemapChange}
         maxAreas={maxAreas}
