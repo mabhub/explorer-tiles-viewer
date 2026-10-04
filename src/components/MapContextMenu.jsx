@@ -12,6 +12,7 @@ import {
   CheckBoxOutlineBlank,
   ChevronRight,
   Layers,
+  PersonAdd,
 } from '@mui/icons-material';
 
 import basemaps from '../basemaps';
@@ -38,6 +39,7 @@ const MapContextMenu = ({
   canShowMaxAreas,
   showGrid,
   onGridToggle,
+  onShareAdd,
 }) => {
   const [basemapsAnchor, setBasemapsAnchor] = React.useState(null);
 
@@ -54,6 +56,16 @@ const MapContextMenu = ({
         anchorReference="anchorPosition"
         anchorPosition={position && { top: position.y, left: position.x }}
       >
+        <MenuItem
+          onClick={() => {
+            close();
+            onShareAdd();
+          }}
+        >
+          <ListItemIcon><PersonAdd fontSize="small" /></ListItemIcon>
+          <ListItemText>Ajouter un compte…</ListItemText>
+        </MenuItem>
+        <Divider />
         <MenuItem onClick={event => setBasemapsAnchor(event.currentTarget)}>
           <ListItemIcon><Layers fontSize="small" /></ListItemIcon>
           <ListItemText>Fond de carte</ListItemText>

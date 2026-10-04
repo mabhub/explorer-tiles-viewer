@@ -12,7 +12,6 @@ import {
   ToggleButtonGroup,
 } from '@mui/material';
 import {
-  Add,
   ChevronLeft,
   Clear,
   Edit,
@@ -212,6 +211,7 @@ const Home = () => {
           labelByShare={labelByShare}
           contextMenuPosition={contextMenuPosition}
           onContextMenuPositionChange={setContextMenuPosition}
+          onShareAdd={() => openShareDialog()}
         />
         <Stack
           spacing={1}
@@ -320,17 +320,12 @@ const Home = () => {
                   )}
                 </Stack>
               ))}
+              {!shareIdList.length && (
+                <Box component="small" sx={{ color: 'text.secondary', pl: 1 }}>
+                  Aucun compte : menu ⋮ puis « Ajouter un compte… »
+                </Box>
+              )}
             </Stack>
-
-            <IconButton
-              size="small"
-              title="Ajouter un compte"
-              aria-label="Ajouter un compte"
-              onClick={() => openShareDialog()}
-              sx={{ mb: 1 }}
-            >
-              <Add fontSize="small" />
-            </IconButton>
 
             {colorMode === 'count' && activePersonCount > 0 && (
               <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1, pl: 1 }}>

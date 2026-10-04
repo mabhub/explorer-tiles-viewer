@@ -38,6 +38,7 @@ const MainMap = ({
   labelByShare,
   contextMenuPosition,
   onContextMenuPositionChange,
+  onShareAdd,
 }) => {
   const mapRef = React.useRef();
   // Labels of the basemap (vector ones only) to keep above the grid, looked up
@@ -293,6 +294,7 @@ const MainMap = ({
         canShowMaxAreas={colorMode === 'owner'}
         showGrid={showGrid}
         onGridToggle={() => setShowGrid(previous => !previous)}
+        onShareAdd={onShareAdd}
       />
     </Map>
   );
