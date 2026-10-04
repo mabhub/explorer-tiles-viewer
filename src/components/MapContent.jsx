@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layer, Source } from 'react-map-gl/maplibre';
 
-import { shareColors, sharedColors } from '../share-colors';
+import { sharedColors } from '../share-colors';
 
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
 
@@ -19,18 +19,16 @@ const countColor = [
 const getOwnerColor = activePersonCount => [
   'case',
   isUnvisited, '#fff0',
-  [
-    'match', ['number', ['feature-state', 'owner'], -1],
-    ...shareColors.flatMap((color, index) => [index, color]),
-    // Owned by several people: shade by their number
-    activePersonCount > 2
-      ? [
-        'interpolate', ['linear'], ['number', ['feature-state', 'count'], 2],
-        2, sharedColors.fewest,
-        activePersonCount, sharedColors.all,
-      ]
-      : sharedColors.all,
-  ],
+  // Owned by a single person: their color
+  ['to-boolean', ['feature-state', 'color']], ['to-color', ['feature-state', 'color']],
+  // Owned by several people: shade by their number
+  activePersonCount > 2
+    ? [
+      'interpolate', ['linear'], ['number', ['feature-state', 'count'], 2],
+      2, sharedColors.fewest,
+      activePersonCount, sharedColors.all,
+    ]
+    : sharedColors.all,
 ];
 
 const MapContent = ({

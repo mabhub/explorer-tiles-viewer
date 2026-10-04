@@ -21,7 +21,7 @@ const interactiveLayerIds = ['tiles'];
 const MainMap = ({
   routes = [],
   colorMode,
-  colorIndexByShare,
+  colorByShare,
   activePersonCount,
 }) => {
   const mapRef = React.useRef();
@@ -78,21 +78,21 @@ const MainMap = ({
       Object.keys(paintedTiles.current).forEach(id => {
         if (!allTiles[id]) {
           map.removeFeatureState({ ...gridFeature, id }, 'count');
-          map.removeFeatureState({ ...gridFeature, id }, 'owner');
+          map.removeFeatureState({ ...gridFeature, id }, 'color');
         }
       });
       Object.entries(allTiles).forEach(([id, { userCount, shares: owners }]) => {
         map.setFeatureState({ ...gridFeature, id }, {
           count: userCount,
-          // Color index of the only owning person (all their shares share it),
-          // -1 when several people own the tile
-          owner: userCount === 1 ? colorIndexByShare[owners[0]] : -1,
+          // Color of the only owning person (all their shares share it), none
+          // when several people own the tile
+          color: userCount === 1 ? colorByShare[owners[0]] : null,
         });
       });
 
       paintedTiles.current = allTiles;
     },
-    [allTiles, mapLoaded, colorIndexByShare],
+    [allTiles, mapLoaded, colorByShare],
   );
 
   const handleMapLoad = React.useCallback(

@@ -29,7 +29,12 @@ import ShareDialog from './ShareDialog';
 import useActivities, { getPersonByShare } from '../hooks/use-activities';
 import useShareAccounts, { getAccountName } from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
-import { getColorIndexByShare, shareColors, sharedColors } from '../share-colors';
+import {
+  getFirstShareByShare,
+  getShareColor,
+  pickShareColor,
+  sharedColors,
+} from '../share-colors';
 
 const globalStyles = { 'html, body, #root': { height: '100%' } };
 const wrapperSx = { height: '100%' };
@@ -41,6 +46,19 @@ const swatchSx = {
   borderRadius: '50%',
   opacity: 0.5,
   verticalAlign: 'middle',
+};
+// A native color picker shaped like the swatch
+const colorInputSx = {
+  ...swatchSx,
+  mr: 1,
+  p: 0,
+  border: 'none',
+  background: 'none',
+  cursor: 'pointer',
+  appearance: 'none',
+  '&::-webkit-color-swatch-wrapper': { p: 0 },
+  '&::-webkit-color-swatch': { border: 'none', borderRadius: '50%' },
+  '&::-moz-color-swatch': { border: 'none', borderRadius: '50%' },
 };
 const sharedSwatchBackground = count => (count > 2
   ? `linear-gradient(to right, ${sharedColors.fewest}, ${sharedColors.all})`
@@ -74,7 +92,7 @@ const Home = () => {
   const shareAccounts = useShareAccounts(shareIdList);
 
   // Several shares of the same person count as one owner
-  const { colorIndexByShare, activePersonCount } = React.useMemo(
+  const { firstShareByShare, colorByShare, activePersonCount } = React.useMemo(
     () => {
       const ids = Object.keys(shares);
       const personByShare = getPersonByShare(ids, shareQueries);
@@ -82,8 +100,11 @@ const Home = () => {
         .filter(id => isShareActive(shares[id]) && personByShare[id] !== undefined)
         .map(id => personByShare[id]);
 
+      const firstShares = getFirstShareByShare(ids, personByShare);
+
       return {
-        colorIndexByShare: getColorIndexByShare(ids, personByShare),
+        firstShareByShare: firstShares,
+        colorByShare: Object.fromEntries(ids.map(id => [id, getShareColor(shares, ids, firstShares[id])])),
         activePersonCount: new Set(activePeople).size,
       };
     },
@@ -142,7 +163,8 @@ const Home = () => {
   const handleShareSubmit = React.useCallback(
     ({ id, alias }) => {
       setShares(prevShares => {
-        const share = prevShares[id] ?? { disabled: false };
+        const share = prevShares[id]
+          ?? { disabled: false, color: pickShareColor(Object.values(colorByShare)) };
         // Emptied when editing, the alias falls back to the Statshunters name;
         // adding an existing share again keeps it
         const newAlias = alias || (dialogShare ? undefined : share.alias);
@@ -150,7 +172,16 @@ const Home = () => {
       });
       setIsDialogOpen(false);
     },
-    [setShares, dialogShare],
+    [setShares, dialogShare, colorByShare],
+  );
+
+  // The color belongs to the person: it is stored on their first share
+  const handleColorChange = React.useCallback(
+    (id, color) => {
+      const firstShare = firstShareByShare[id];
+      setShares(prevShares => ({ ...prevShares, [firstShare]: { ...prevShares[firstShare], color } }));
+    },
+    [setShares, firstShareByShare],
   );
 
   return (
@@ -160,7 +191,7 @@ const Home = () => {
         <MainMap
           routes={routes}
           colorMode={colorMode}
-          colorIndexByShare={colorIndexByShare}
+          colorByShare={colorByShare}
           activePersonCount={activePersonCount}
         />
         <Stack
@@ -187,8 +218,13 @@ const Home = () => {
                     <>
                       {colorMode === 'owner' && (
                         <Box
-                          component="span"
-                          sx={{ ...swatchSx, mr: 1, bgcolor: shareColors[colorIndexByShare[id]] }}
+                          component="input"
+                          type="color"
+                          value={colorByShare[id]}
+                          title="Changer la couleur"
+                          aria-label={`Couleur de ${id}`}
+                          onChange={event => handleColorChange(id, event.target.value)}
+                          sx={colorInputSx}
                         />
                       )}
                       <ShareName id={id} alias={alias} account={shareAccounts[index]?.data} />
