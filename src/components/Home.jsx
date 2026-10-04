@@ -18,7 +18,6 @@ import {
   ErrorOutline,
   MoreVert,
   People,
-  Upload,
 } from '@mui/icons-material';
 import { useMap } from 'react-map-gl/maplibre';
 import useLocalStorageState from 'use-local-storage-state';
@@ -134,6 +133,8 @@ const Home = () => {
   // Kept while the snackbar fades out.
   const [undoable, setUndoable] = React.useState();
   const [isUndoShown, setIsUndoShown] = React.useState(false);
+  // Opened from the map context menu
+  const trackInputRef = React.useRef();
 
   const shareIdList = Object.keys(shares);
   // Same queries as the map: React Query shares them, nothing is fetched twice
@@ -212,6 +213,13 @@ const Home = () => {
       track => (track.id === id ? { ...track, ...changes } : track),
     ));
   };
+
+  // Tracks as listed in the panel, for the map context menu
+  const trackItems = tracks.map(({ id, name, disabled }) => ({
+    id,
+    label: name,
+    enabled: !disabled,
+  }));
 
   const handleTracksToggle = (ids, enabled) => {
     setTracks(prevTracks => prevTracks.map(track => (ids.includes(track.id)
@@ -324,6 +332,17 @@ const Home = () => {
           onShareAdd={() => openShareDialog()}
           shareItems={shareItems}
           onSharesToggle={handleSharesToggle}
+          onTrackAdd={() => trackInputRef.current.click()}
+          trackItems={trackItems}
+          onTracksToggle={handleTracksToggle}
+        />
+        <input
+          ref={trackInputRef}
+          type="file"
+          multiple
+          accept=".gpx,.geojson,.json,application/gpx+xml,application/geo+json,application/json"
+          hidden
+          onChange={handleUpload}
         />
         <Stack
           spacing={1}
@@ -631,34 +650,6 @@ const Home = () => {
             onClose={() => setIsDialogOpen(false)}
             onSubmit={handleShareSubmit}
           />
-
-          <Fab
-            color="primary"
-            size="small"
-          >
-            <Upload />
-            <Box
-              component="label"
-              htmlFor="upload"
-              sx={{ position: 'absolute', inset: 0 }}
-            />
-            <Box
-              component="input"
-              multiple
-              accept=".geojson,.json,application/json,application/geojson,.gpx"
-              type="file"
-              id="upload"
-              // Sized to the button: wider by default, it would catch the
-              // clicks meant for the map beside it
-              sx={{
-                opacity: 0,
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-              }}
-              onChange={handleUpload}
-            />
-          </Fab>
         </Stack>
       </Box>
     </>

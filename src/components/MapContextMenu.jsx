@@ -7,12 +7,13 @@ import {
   MenuItem,
 } from '@mui/material';
 import {
+  AddRoad,
   Check,
   CheckBox,
   CheckBoxOutlineBlank,
   ChevronRight,
   Layers,
-  People,
+  Map as MapIcon,
   PersonAdd,
 } from '@mui/icons-material';
 
@@ -30,6 +31,22 @@ const submenuOrigins = {
   transformOrigin: { vertical: 'top', horizontal: 'left' },
 };
 
+// An account or a track in the layers submenu
+const LayerItem = ({
+  id,
+  label,
+  detail,
+  enabled,
+  onToggle,
+}) => (
+  <MenuItem role="menuitemcheckbox" aria-checked={enabled} onClick={() => onToggle([id], !enabled)}>
+    <ListItemIcon>
+      {enabled ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
+    </ListItemIcon>
+    <ListItemText secondary={detail}>{label}</ListItemText>
+  </MenuItem>
+);
+
 // Opened by a right click (or a long press) on the map
 const MapContextMenu = ({
   position,
@@ -45,15 +62,18 @@ const MapContextMenu = ({
   onCountActivitiesToggle,
   canCountActivities,
   onShareAdd,
+  onTrackAdd,
   shareItems,
   onSharesToggle,
+  trackItems,
+  onTracksToggle,
 }) => {
   const [basemapsAnchor, setBasemapsAnchor] = React.useState(null);
-  const [accountsAnchor, setAccountsAnchor] = React.useState(null);
+  const [layersAnchor, setLayersAnchor] = React.useState(null);
 
   const close = () => {
     setBasemapsAnchor(null);
-    setAccountsAnchor(null);
+    setLayersAnchor(null);
     onClose();
   };
   // Pressing a submenu leaves the menu open, the other way round closes it
@@ -61,20 +81,24 @@ const MapContextMenu = ({
     open: Boolean(position),
     onClose: close,
     name: 'map',
-    inside: ['map', 'basemaps', 'accounts'],
+    inside: ['map', 'basemaps', 'layers'],
   });
   const basemapsMenuProps = usePassThroughMenu({
     open: Boolean(basemapsAnchor),
     onClose: () => setBasemapsAnchor(null),
     name: 'basemaps',
   });
-  const accountsMenuProps = usePassThroughMenu({
-    open: Boolean(accountsAnchor),
-    onClose: () => setAccountsAnchor(null),
-    name: 'accounts',
+  const layersMenuProps = usePassThroughMenu({
+    open: Boolean(layersAnchor),
+    onClose: () => setLayersAnchor(null),
+    name: 'layers',
   });
 
-  const allShareIds = shareItems.map(({ id }) => id);
+  const layerItems = [...shareItems, ...trackItems];
+  const toggleAll = enabled => {
+    onSharesToggle(shareItems.map(({ id }) => id), enabled);
+    onTracksToggle(trackItems.map(({ id }) => id), enabled);
+  };
 
   return (
     <>
@@ -95,16 +119,27 @@ const MapContextMenu = ({
           <ListItemText>Ajouter un compte…</ListItemText>
         </MenuItem>
         <MenuItem
-          disabled={!shareItems.length}
-          onClick={event => setAccountsAnchor(event.currentTarget)}
+          onClick={() => {
+            // Opened while the click is still being handled, or browsers
+            // block the file chooser
+            onTrackAdd();
+            close();
+          }}
         >
-          <ListItemIcon><People fontSize="small" /></ListItemIcon>
-          <ListItemText>Comptes</ListItemText>
+          <ListItemIcon><AddRoad fontSize="small" /></ListItemIcon>
+          <ListItemText>Ajouter une trace…</ListItemText>
+        </MenuItem>
+        <MenuItem
+          disabled={!layerItems.length}
+          onClick={event => setLayersAnchor(event.currentTarget)}
+        >
+          <ListItemIcon><Layers fontSize="small" /></ListItemIcon>
+          <ListItemText>Couches</ListItemText>
           <ChevronRight fontSize="small" sx={{ ml: 2 }} />
         </MenuItem>
         <Divider />
         <MenuItem onClick={event => setBasemapsAnchor(event.currentTarget)}>
-          <ListItemIcon><Layers fontSize="small" /></ListItemIcon>
+          <ListItemIcon><MapIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Fond de carte</ListItemText>
           <ChevronRight fontSize="small" sx={{ ml: 2 }} />
         </MenuItem>
@@ -169,44 +204,33 @@ const MapContextMenu = ({
         ))}
       </Menu>
 
-      {/* Left open, to toggle several accounts in a row */}
+      {/* Left open, to toggle several layers in a row */}
       <Menu
-        {...accountsMenuProps}
-        open={Boolean(accountsAnchor)}
-        anchorEl={accountsAnchor}
-        onClose={() => setAccountsAnchor(null)}
+        {...layersMenuProps}
+        open={Boolean(layersAnchor)}
+        anchorEl={layersAnchor}
+        onClose={() => setLayersAnchor(null)}
         {...submenuOrigins}
       >
         <MenuItem
-          disabled={shareItems.every(({ enabled }) => enabled)}
-          onClick={() => onSharesToggle(allShareIds, true)}
+          disabled={layerItems.every(({ enabled }) => enabled)}
+          onClick={() => toggleAll(true)}
         >
           <ListItemText inset>Tout activer</ListItemText>
         </MenuItem>
         <MenuItem
-          disabled={!shareItems.some(({ enabled }) => enabled)}
-          onClick={() => onSharesToggle(allShareIds, false)}
+          disabled={!layerItems.some(({ enabled }) => enabled)}
+          onClick={() => toggleAll(false)}
         >
           <ListItemText inset>Tout désactiver</ListItemText>
         </MenuItem>
-        <Divider />
-        {shareItems.map(({
-          id,
-          label,
-          detail,
-          enabled,
-        }) => (
-          <MenuItem
-            key={id}
-            role="menuitemcheckbox"
-            aria-checked={enabled}
-            onClick={() => onSharesToggle([id], !enabled)}
-          >
-            <ListItemIcon>
-              {enabled ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
-            </ListItemIcon>
-            <ListItemText secondary={detail}>{label}</ListItemText>
-          </MenuItem>
+        {shareItems.length > 0 && <Divider />}
+        {shareItems.map(item => (
+          <LayerItem key={item.id} {...item} onToggle={onSharesToggle} />
+        ))}
+        {trackItems.length > 0 && <Divider />}
+        {trackItems.map(item => (
+          <LayerItem key={item.id} {...item} onToggle={onTracksToggle} />
         ))}
       </Menu>
     </>
