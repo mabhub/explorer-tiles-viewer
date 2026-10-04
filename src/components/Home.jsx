@@ -1,10 +1,12 @@
 import React from 'react';
 import {
   Box,
+  CircularProgress,
   Fab,
   FormControlLabel,
   FormGroup,
   GlobalStyles,
+  IconButton,
   Paper,
   Stack,
   Switch,
@@ -12,12 +14,13 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
-import { Clear, Upload } from '@mui/icons-material';
+import { Clear, ErrorOutline, Upload } from '@mui/icons-material';
 import togeojson from '@mapbox/togeojson';
 import { DOMParser } from 'xmldom';
 import useLocalStorageState from 'use-local-storage-state';
 
 import MainMap from './MainMap';
+import useActivities from '../hooks/use-activities';
 import useShares, { isShareActive } from '../hooks/use-shares';
 import { getShareColor, sharedColors } from '../share-colors';
 
@@ -45,6 +48,8 @@ const Home = () => {
   const [isShareInvalid, setIsShareInvalid] = React.useState(false);
 
   const shareIdList = Object.keys(shares);
+  // Same queries as the map: React Query shares them, nothing is fetched twice
+  const shareQueries = useActivities(shareIdList.join(','));
   const activeShareCount = Object.values(shares).filter(isShareActive).length;
 
   const handleColorModeChange = React.useCallback(
@@ -137,7 +142,7 @@ const Home = () => {
             </ToggleButtonGroup>
 
             <FormGroup sx={{ mb: 1, pl: 1 }}>
-              {Object.entries(shares).map(([id, { disabled, alias }]) => (
+              {Object.entries(shares).map(([id, { disabled, alias }], index) => (
                 <FormControlLabel
                   label={(
                     <>
@@ -148,6 +153,23 @@ const Home = () => {
                         />
                       )}
                       {alias ? (<>{alias} <small>({id})</small></>) : id}
+                      {shareQueries[index]?.isLoading && (
+                        <CircularProgress size={12} sx={{ ml: 1, verticalAlign: 'middle' }} />
+                      )}
+                      {shareQueries[index]?.isError && (
+                        <IconButton
+                          size="small"
+                          color="error"
+                          title="Échec du chargement, réessayer"
+                          onClick={event => {
+                            // Inside the label: do not toggle the share
+                            event.preventDefault();
+                            shareQueries[index].refetch();
+                          }}
+                        >
+                          <ErrorOutline fontSize="inherit" />
+                        </IconButton>
+                      )}
                     </>
                   )}
                   key={id}
