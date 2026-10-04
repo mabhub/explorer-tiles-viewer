@@ -10,6 +10,10 @@ const getAccount = async shareId => {
   return response.json();
 };
 
+export const getAccountName = account => [account?.firstname, account?.lastname]
+  .filter(Boolean)
+  .join(' ');
+
 // Without the endpoint, shares are simply shown by id
 const useShareAccounts = shareIds => useQueries({
   queries: shareIds.map(shareId => ({

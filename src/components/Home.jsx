@@ -16,6 +16,7 @@ import {
 import {
   Add,
   Clear,
+  Edit,
   ErrorOutline,
   Upload,
 } from '@mui/icons-material';
@@ -26,7 +27,7 @@ import useLocalStorageState from 'use-local-storage-state';
 import MainMap from './MainMap';
 import ShareDialog from './ShareDialog';
 import useActivities, { getPersonByShare } from '../hooks/use-activities';
-import useShareAccounts from '../hooks/use-share-accounts';
+import useShareAccounts, { getAccountName } from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
 import { getColorIndexByShare, shareColors, sharedColors } from '../share-colors';
 
@@ -47,7 +48,7 @@ const sharedSwatchBackground = count => (count > 2
 
 // The same person can have several shares: the id tells them apart
 const ShareName = ({ id, alias, account }) => {
-  const name = alias || [account?.firstname, account?.lastname].filter(Boolean).join(' ');
+  const name = alias || getAccountName(account);
   if (!name) { return id; }
 
   return (
@@ -63,7 +64,9 @@ const Home = () => {
   const [routes, setRoutes] = React.useState([]);
   const [shares, setShares] = useShares();
   const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
-  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  // Share edited in the dialog, none when adding one
+  const [dialogShare, setDialogShare] = React.useState();
 
   const shareIdList = Object.keys(shares);
   // Same queries as the map: React Query shares them, nothing is fetched twice
@@ -131,14 +134,23 @@ const Home = () => {
     [setShares],
   );
 
-  const handleShareAdd = React.useCallback(
-    id => {
-      setShares(prevShares => (prevShares[id]
-        ? prevShares
-        : { ...prevShares, [id]: { disabled: false } }));
-      setIsAddDialogOpen(false);
+  const openShareDialog = share => {
+    setDialogShare(share);
+    setIsDialogOpen(true);
+  };
+
+  const handleShareSubmit = React.useCallback(
+    ({ id, alias }) => {
+      setShares(prevShares => {
+        const share = prevShares[id] ?? { disabled: false };
+        // Emptied when editing, the alias falls back to the Statshunters name;
+        // adding an existing share again keeps it
+        const newAlias = alias || (dialogShare ? undefined : share.alias);
+        return { ...prevShares, [id]: { ...share, alias: newAlias } };
+      });
+      setIsDialogOpen(false);
     },
-    [setShares],
+    [setShares, dialogShare],
   );
 
   return (
@@ -180,6 +192,23 @@ const Home = () => {
                         />
                       )}
                       <ShareName id={id} alias={alias} account={shareAccounts[index]?.data} />
+                      <IconButton
+                        size="small"
+                        title="Modifier le nom affiché"
+                        aria-label={`Modifier ${id}`}
+                        onClick={event => {
+                          // Inside the label: do not toggle the share
+                          event.preventDefault();
+                          openShareDialog({
+                            id,
+                            alias,
+                            accountName: getAccountName(shareAccounts[index]?.data),
+                          });
+                        }}
+                        sx={{ ml: 0.5, color: 'text.disabled' }}
+                      >
+                        <Edit sx={{ fontSize: 14 }} />
+                      </IconButton>
                       {shareQueries[index]?.isLoading && (
                         <CircularProgress size={12} sx={{ ml: 1, verticalAlign: 'middle' }} />
                       )}
@@ -216,7 +245,7 @@ const Home = () => {
               size="small"
               title="Ajouter un compte"
               aria-label="Ajouter un compte"
-              onClick={() => setIsAddDialogOpen(true)}
+              onClick={() => openShareDialog()}
               sx={{ mb: 1 }}
             >
               <Add fontSize="small" />
@@ -241,9 +270,10 @@ const Home = () => {
           </Paper>
 
           <ShareDialog
-            open={isAddDialogOpen}
-            onClose={() => setIsAddDialogOpen(false)}
-            onSubmit={handleShareAdd}
+            open={isDialogOpen}
+            share={dialogShare}
+            onClose={() => setIsDialogOpen(false)}
+            onSubmit={handleShareSubmit}
           />
 
           <Fab

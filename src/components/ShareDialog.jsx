@@ -11,20 +11,26 @@ import {
 // A share link, with or without trailing slash or query string, or a bare id
 const shareIdPattern = /^(?:.*\/share\/)?(\w+)\/?(?:[?#].*)?$/;
 
-const ShareDialog = ({ open, onClose, onSubmit }) => {
+// Adds a share, or edits the given one: its id then stays as is
+const ShareDialog = ({
+  open,
+  share,
+  onClose,
+  onSubmit,
+}) => {
   const [isInvalid, setIsInvalid] = React.useState(false);
 
   const handleSubmit = event => {
     event.preventDefault();
 
-    const { share } = Object.fromEntries(new FormData(event.target).entries());
-    const [, id] = share.trim().match(shareIdPattern) || [];
+    const { link = '', alias } = Object.fromEntries(new FormData(event.target).entries());
+    const id = share?.id ?? (link.trim().match(shareIdPattern) || [])[1];
     if (!id) {
       setIsInvalid(true);
       return;
     }
 
-    onSubmit(id);
+    onSubmit({ id, alias: alias.trim() });
   };
 
   return (
@@ -36,23 +42,46 @@ const ShareDialog = ({ open, onClose, onSubmit }) => {
       PaperProps={{ component: 'form', onSubmit: handleSubmit }}
       TransitionProps={{ onExited: () => setIsInvalid(false) }}
     >
-      <DialogTitle>Ajouter un compte</DialogTitle>
+      <DialogTitle>{share ? 'Modifier le compte' : 'Ajouter un compte'}</DialogTitle>
       <DialogContent>
+        {share
+          ? (
+            <TextField
+              fullWidth
+              margin="dense"
+              label="Identifiant de partage"
+              value={share.id}
+              disabled
+            />
+          )
+          : (
+            <TextField
+              autoFocus
+              fullWidth
+              margin="dense"
+              name="link"
+              label="Lien ou identifiant de partage"
+              placeholder="https://www.statshunters.com/share/abc…"
+              error={isInvalid}
+              helperText={isInvalid ? 'Lien de partage invalide' : ' '}
+              onChange={() => setIsInvalid(false)}
+            />
+          )}
         <TextField
-          autoFocus
+          autoFocus={Boolean(share)}
           fullWidth
           margin="dense"
-          name="share"
-          label="Lien ou identifiant de partage"
-          placeholder="https://www.statshunters.com/share/abc…"
-          error={isInvalid}
-          helperText={isInvalid ? 'Lien de partage invalide' : ' '}
-          onChange={() => setIsInvalid(false)}
+          name="alias"
+          label="Nom affiché"
+          defaultValue={share?.alias ?? ''}
+          placeholder={share?.accountName}
+          helperText="Facultatif : remplace le nom Statshunters"
+          InputLabelProps={{ shrink: true }}
         />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Annuler</Button>
-        <Button type="submit" variant="contained">Ajouter</Button>
+        <Button type="submit" variant="contained">{share ? 'Enregistrer' : 'Ajouter'}</Button>
       </DialogActions>
     </Dialog>
   );
