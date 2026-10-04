@@ -1,7 +1,12 @@
 import React from 'react';
 import { Layer, Source } from 'react-map-gl/maplibre';
 
-import { countColors, sharedColors } from '../share-colors';
+import {
+  ageColors,
+  countColors,
+  currentYear,
+  sharedColors,
+} from '../share-colors';
 
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
 
@@ -27,6 +32,20 @@ const countColor = [
   ['>=', ['feature-state', 'count'], 3], countColors[2],
   '#fff0',
 ];
+
+// Tiles without a known date (missing in the data) count as the oldest
+const ageColor = [
+  'case',
+  isUnvisited, '#fff0',
+  ['!', ['to-boolean', ['feature-state', 'year']]], ageColors.at(-1),
+  [
+    'step', ['-', currentYear, ['number', ['feature-state', 'year'], 0]],
+    ageColors[0],
+    ...ageColors.slice(1).flatMap((color, index) => [index + 1, color]),
+  ],
+];
+
+const fillColors = { count: countColor, age: ageColor };
 
 const getOwnerColor = activePersonCount => [
   'case',
@@ -66,7 +85,7 @@ const MapContent = ({
           'fill-outline-color': getOutlineColor(showGrid),
           'fill-color': colorMode === 'owner'
             ? getOwnerColor(activePersonCount)
-            : countColor,
+            : fillColors[colorMode] ?? countColor,
           'fill-opacity': [
             'case',
             ['==', ['feature-state', 'clicked'], true], 0.75,

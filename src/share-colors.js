@@ -1,6 +1,11 @@
 // Count coloring mode: tiles owned by 1, 2, then 3 people or more
 export const countColors = ['green', 'orange', 'red'];
 
+// Age coloring mode: year of the latest activity on a tile, from the current
+// year (most intense) to 5 years ago or more (gray, still visible)
+export const currentYear = new Date().getFullYear();
+export const ageColors = ['#0d47a1', '#1565c0', '#1e88e5', '#64b5f6', '#90a4ae', '#9e9e9e'];
+
 // Per-person colors for the owner coloring mode. Reds and oranges are left
 // out: the count coloring mode uses them.
 export const shareColors = [

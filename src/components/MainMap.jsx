@@ -71,11 +71,16 @@ const MainMap = ({
                 shares: [],
                 activities: [],
                 userCount: 0,
+                latestDate: '',
               };
             }
             const tile = store[key];
 
             tile.activities.push({ activity, shareId: id });
+            // "YYYY-MM-DD hh:mm:ss" dates compare as strings
+            if (activity.date > tile.latestDate) {
+              tile.latestDate = activity.date;
+            }
             if (!tile.users.includes(userId)) {
               tile.users.push(userId);
               tile.userCount = tile.users.length;
@@ -142,14 +147,16 @@ const MainMap = ({
         if (!allTiles[id]) {
           map.removeFeatureState({ ...gridFeature, id }, 'count');
           map.removeFeatureState({ ...gridFeature, id }, 'color');
+          map.removeFeatureState({ ...gridFeature, id }, 'year');
         }
       });
-      Object.entries(allTiles).forEach(([id, { userCount, shares: owners }]) => {
+      Object.entries(allTiles).forEach(([id, { userCount, shares: owners, latestDate }]) => {
         map.setFeatureState({ ...gridFeature, id }, {
           count: userCount,
           // Color of the only owning person (all their shares share it), none
           // when several people own the tile
           color: userCount === 1 ? colorByShare[owners[0]] : null,
+          year: latestDate ? Number(latestDate.slice(0, 4)) : null,
         });
       });
 

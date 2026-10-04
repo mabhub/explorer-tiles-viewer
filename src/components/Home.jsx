@@ -31,7 +31,9 @@ import useActivities, { getPersonByShare } from '../hooks/use-activities';
 import useShareAccounts, { getAccountName } from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
 import {
+  ageColors,
   countColors,
+  currentYear,
   getFirstShareByShare,
   getShareColor,
   pickShareColor,
@@ -237,6 +239,7 @@ const Home = () => {
               >
                 <ToggleButton value="count">Nombre</ToggleButton>
                 <ToggleButton value="owner">Compte</ToggleButton>
+                <ToggleButton value="age">Âge</ToggleButton>
               </ToggleButtonGroup>
               <IconButton
                 size="small"
@@ -331,6 +334,20 @@ const Home = () => {
                   <Stack key={color} direction="row" alignItems="center" spacing={0.5}>
                     <Box component="span" sx={{ ...swatchSx, bgcolor: color }} />
                     <small>{index < countColors.length - 1 ? index + 1 : `${index + 1} et +`}</small>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+
+            {colorMode === 'age' && activePersonCount > 0 && (
+              <Stack direction="row" alignItems="center" flexWrap="wrap" sx={{ mb: 1, pl: 1, columnGap: 1.5 }}>
+                <small>Dernier passage</small>
+                {ageColors.map((color, index) => (
+                  <Stack key={color} direction="row" alignItems="center" spacing={0.5}>
+                    <Box component="span" sx={{ ...swatchSx, bgcolor: color }} />
+                    <small>
+                      {index < ageColors.length - 1 ? currentYear - index : `≤ ${currentYear - index}`}
+                    </small>
                   </Stack>
                 ))}
               </Stack>
