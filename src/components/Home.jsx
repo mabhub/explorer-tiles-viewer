@@ -10,16 +10,21 @@ import {
   Paper,
   Stack,
   Switch,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
-import { Clear, ErrorOutline, Upload } from '@mui/icons-material';
+import {
+  Add,
+  Clear,
+  ErrorOutline,
+  Upload,
+} from '@mui/icons-material';
 import togeojson from '@mapbox/togeojson';
 import { DOMParser } from 'xmldom';
 import useLocalStorageState from 'use-local-storage-state';
 
 import MainMap from './MainMap';
+import ShareDialog from './ShareDialog';
 import useActivities, { getPersonByShare } from '../hooks/use-activities';
 import useShareAccounts from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
@@ -36,8 +41,6 @@ const swatchSx = {
   opacity: 0.5,
   verticalAlign: 'middle',
 };
-// A share link, with or without trailing slash or query string, or a bare id
-const shareIdPattern = /^(?:.*\/share\/)?(\w+)\/?(?:[?#].*)?$/;
 const sharedSwatchBackground = count => (count > 2
   ? `linear-gradient(to right, ${sharedColors.fewest}, ${sharedColors.all})`
   : sharedColors.all);
@@ -60,7 +63,7 @@ const Home = () => {
   const [routes, setRoutes] = React.useState([]);
   const [shares, setShares] = useShares();
   const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
-  const [isShareInvalid, setIsShareInvalid] = React.useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
 
   const shareIdList = Object.keys(shares);
   // Same queries as the map: React Query shares them, nothing is fetched twice
@@ -128,25 +131,12 @@ const Home = () => {
     [setShares],
   );
 
-  const handleShareSubmit = React.useCallback(
-    event => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const formData = new FormData(event.target);
-      const { newShare } = Object.fromEntries(formData.entries());
-
-      const [, id] = newShare.trim().match(shareIdPattern) || [];
-      if (!id) {
-        setIsShareInvalid(true);
-        return;
-      }
-
+  const handleShareAdd = React.useCallback(
+    id => {
       setShares(prevShares => (prevShares[id]
         ? prevShares
         : { ...prevShares, [id]: { disabled: false } }));
-
-      event.target.reset();
+      setIsAddDialogOpen(false);
     },
     [setShares],
   );
@@ -222,6 +212,16 @@ const Home = () => {
               ))}
             </FormGroup>
 
+            <IconButton
+              size="small"
+              title="Ajouter un compte"
+              aria-label="Ajouter un compte"
+              onClick={() => setIsAddDialogOpen(true)}
+              sx={{ mb: 1 }}
+            >
+              <Add fontSize="small" />
+            </IconButton>
+
             {colorMode === 'owner' && activePersonCount > 1 && (
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1, pl: 1 }}>
                 <small>Partagé par</small>
@@ -238,20 +238,13 @@ const Home = () => {
                 <small>{activePersonCount}</small>
               </Stack>
             )}
-
-            <form onSubmit={handleShareSubmit}>
-              <TextField
-                name="newShare"
-                size="small"
-                variant="filled"
-                label="Ajouter une grille"
-                placeholder="https://statshunters.com/share/abc…"
-                error={isShareInvalid}
-                helperText={isShareInvalid ? 'Lien de partage invalide' : undefined}
-                onChange={() => setIsShareInvalid(false)}
-              />
-            </form>
           </Paper>
+
+          <ShareDialog
+            open={isAddDialogOpen}
+            onClose={() => setIsAddDialogOpen(false)}
+            onSubmit={handleShareAdd}
+          />
 
           <Fab
             color="primary"
