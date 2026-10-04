@@ -36,6 +36,8 @@ const MapContextMenu = ({
   maxAreas,
   onMaxAreaToggle,
   canShowMaxAreas,
+  showGrid,
+  onGridToggle,
 }) => {
   const [basemapsAnchor, setBasemapsAnchor] = React.useState(null);
 
@@ -56,6 +58,12 @@ const MapContextMenu = ({
           <ListItemIcon><Layers fontSize="small" /></ListItemIcon>
           <ListItemText>Fond de carte</ListItemText>
           <ChevronRight fontSize="small" sx={{ ml: 2 }} />
+        </MenuItem>
+        <MenuItem role="menuitemcheckbox" aria-checked={showGrid} onClick={onGridToggle}>
+          <ListItemIcon>
+            {showGrid ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
+          </ListItemIcon>
+          <ListItemText secondary="Masquée sous le zoom 10">Grille</ListItemText>
         </MenuItem>
         <Divider />
         {Object.entries(maxAreaLabels).map(([kind, label]) => (

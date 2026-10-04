@@ -7,6 +7,18 @@ export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
 
 const isUnvisited = ['!', ['to-boolean', ['feature-state', 'count']]];
 
+const outlineColor = '#00000044';
+
+// Colored tiles keep their outline. The grid of unvisited ones fades out under
+// zoom 10, where it is too dense to read, and can be hidden altogether.
+const getOutlineColor = showGrid => (showGrid
+  ? [
+    'interpolate', ['linear'], ['zoom'],
+    9, ['case', isUnvisited, '#0000', outlineColor],
+    10, outlineColor,
+  ]
+  : ['case', isUnvisited, '#0000', outlineColor]);
+
 const countColor = [
   'case',
   isUnvisited, '#fff0',
@@ -37,6 +49,7 @@ const MapContent = ({
   colorMode,
   activePersonCount,
   maxAreas,
+  showGrid,
 }) => (
   <>
     <Source
@@ -50,7 +63,7 @@ const MapContent = ({
         type="fill"
         source-layer={gridFeature.sourceLayer}
         paint={{
-          'fill-outline-color': '#00000044',
+          'fill-outline-color': getOutlineColor(showGrid),
           'fill-color': colorMode === 'owner'
             ? getOwnerColor(activePersonCount)
             : countColor,
