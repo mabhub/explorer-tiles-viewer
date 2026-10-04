@@ -13,10 +13,12 @@ import {
 } from '@mui/material';
 import {
   Add,
+  ChevronLeft,
   Clear,
   Edit,
   ErrorOutline,
   MoreVert,
+  People,
   Upload,
 } from '@mui/icons-material';
 import togeojson from '@mapbox/togeojson';
@@ -82,6 +84,7 @@ const Home = () => {
   const [routes, setRoutes] = React.useState([]);
   const [shares, setShares] = useShares();
   const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
+  const [isPanelCollapsed, setIsPanelCollapsed] = useLocalStorageState('panelCollapsed', { defaultValue: false });
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   // The map context menu also opens from the panel, for touch screens
   const [contextMenuPosition, setContextMenuPosition] = React.useState();
@@ -212,7 +215,18 @@ const Home = () => {
           spacing={1}
           sx={{ position: 'absolute', left: '1rem', top: '1rem' }}
         >
-          <Paper sx={{ p: 1 }}>
+          {isPanelCollapsed && (
+            <Fab
+              size="small"
+              title="Afficher les comptes"
+              aria-label="Afficher les comptes"
+              onClick={() => setIsPanelCollapsed(false)}
+            >
+              <People />
+            </Fab>
+          )}
+
+          <Paper sx={{ p: 1, display: isPanelCollapsed ? 'none' : undefined }}>
             <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1 }}>
               <ToggleButtonGroup
                 value={colorMode}
@@ -234,6 +248,14 @@ const Home = () => {
                 }}
               >
                 <MoreVert fontSize="small" />
+              </IconButton>
+              <IconButton
+                size="small"
+                title="Replier le panneau"
+                aria-label="Replier le panneau"
+                onClick={() => setIsPanelCollapsed(true)}
+              >
+                <ChevronLeft fontSize="small" />
               </IconButton>
             </Stack>
 
