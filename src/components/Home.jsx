@@ -21,6 +21,7 @@ import useLocalStorageState from 'use-local-storage-state';
 
 import MainMap from './MainMap';
 import useActivities from '../hooks/use-activities';
+import useShareAccounts from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
 import { getShareColor, sharedColors } from '../share-colors';
 
@@ -41,6 +42,20 @@ const sharedSwatchBackground = count => (count > 2
   ? `linear-gradient(to right, ${sharedColors.fewest}, ${sharedColors.all})`
   : sharedColors.all);
 
+// The same person can have several shares: the id tells them apart
+const ShareName = ({ id, alias, account }) => {
+  const name = alias || [account?.firstname, account?.lastname].filter(Boolean).join(' ');
+  if (!name) { return id; }
+
+  return (
+    <>
+      {name}
+      {' '}
+      <Box component="small" sx={{ color: 'text.secondary' }}>{id}</Box>
+    </>
+  );
+};
+
 const Home = () => {
   const [routes, setRoutes] = React.useState([]);
   const [shares, setShares] = useShares();
@@ -50,6 +65,7 @@ const Home = () => {
   const shareIdList = Object.keys(shares);
   // Same queries as the map: React Query shares them, nothing is fetched twice
   const shareQueries = useActivities(shareIdList.join(','));
+  const shareAccounts = useShareAccounts(shareIdList);
   const activeShareCount = Object.values(shares).filter(isShareActive).length;
 
   const handleColorModeChange = React.useCallback(
@@ -152,7 +168,7 @@ const Home = () => {
                           sx={{ ...swatchSx, mr: 1, bgcolor: getShareColor(shareIdList, id) }}
                         />
                       )}
-                      {alias ? (<>{alias} <small>({id})</small></>) : id}
+                      <ShareName id={id} alias={alias} account={shareAccounts[index]?.data} />
                       {shareQueries[index]?.isLoading && (
                         <CircularProgress size={12} sx={{ ml: 1, verticalAlign: 'middle' }} />
                       )}
