@@ -12,6 +12,7 @@ import {
   Switch,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -107,6 +108,21 @@ const trackNameSx = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 };
+
+const colorModeTooltips = {
+  count:      'Colore chaque tuile selon le nombre de personnes qui l\'ont visitée.',
+  activities: 'Colore chaque tuile selon le nombre d\'activités qui l\'ont traversée.',
+  owner:      'Colore chaque tuile de la couleur de la personne qui l\'a visitée, en gris si elles sont plusieurs.',
+  age:        'Colore chaque tuile selon l\'année de sa dernière activité, de la plus récente (vive) à la plus ancienne (pâle).',
+};
+
+// ToggleButtonGroup clones its children and reads their `value`: the tooltip
+// goes inside
+const ColorModeButton = React.forwardRef(({ tooltip, ...props }, ref) => (
+  <Tooltip title={tooltip} describeChild>
+    <ToggleButton ref={ref} {...props} />
+  </Tooltip>
+));
 
 const Home = () => {
   const { main: map } = useMap();
@@ -378,9 +394,14 @@ const Home = () => {
                 size="small"
                 onChange={handleColorModeChange}
               >
-                <ToggleButton value="count">Nombre</ToggleButton>
-                <ToggleButton value="owner">Compte</ToggleButton>
-                <ToggleButton value="age">Âge</ToggleButton>
+                <ColorModeButton
+                  value="count"
+                  tooltip={colorModeTooltips[countActivities ? 'activities' : 'count']}
+                >
+                  Nombre
+                </ColorModeButton>
+                <ColorModeButton value="owner" tooltip={colorModeTooltips.owner}>Compte</ColorModeButton>
+                <ColorModeButton value="age" tooltip={colorModeTooltips.age}>Âge</ColorModeButton>
               </ToggleButtonGroup>
               <IconButton
                 size="small"
