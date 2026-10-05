@@ -124,6 +124,9 @@ const ColorModeButton = React.forwardRef(({ tooltip, ...props }, ref) => (
   </Tooltip>
 ));
 
+// Where the space key already acts: fields, controls, dialogs and menus
+const spaceTargets = 'input, textarea, select, button, summary, [role=button], .MuiModal-root';
+
 const Home = () => {
   const { main: map } = useMap();
   const [shares, setShares] = useShares();
@@ -135,6 +138,34 @@ const Home = () => {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   // The map context menu also opens from the panel, for touch screens
   const [contextMenuPosition, setContextMenuPosition] = React.useState();
+  // ...and from the space key, in the middle of the window
+  React.useEffect(
+    () => {
+      const handleKey = event => {
+        const { target } = event;
+        if (
+          event.key !== ' '
+          || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
+          || target.isContentEditable
+          || target.closest(spaceTargets)
+        ) { return; }
+
+        event.preventDefault();
+        // Menu items run on key up: opened on key down, the menu would get
+        // the key up on its first item
+        if (event.type === 'keyup') {
+          setContextMenuPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+        }
+      };
+      document.addEventListener('keydown', handleKey);
+      document.addEventListener('keyup', handleKey);
+      return () => {
+        document.removeEventListener('keydown', handleKey);
+        document.removeEventListener('keyup', handleKey);
+      };
+    },
+    [],
+  );
   // Share edited in the dialog, none when adding one
   const [dialogShare, setDialogShare] = React.useState();
   // Account whose context menu is open, and where: { id, x, y }
