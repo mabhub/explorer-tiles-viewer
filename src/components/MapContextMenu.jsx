@@ -15,6 +15,7 @@ import {
   Layers,
   Map as MapIcon,
   PersonAdd,
+  Visibility,
 } from '@mui/icons-material';
 
 import basemaps from '../basemaps';
@@ -31,6 +32,20 @@ const submenuOrigins = {
   transformOrigin: { vertical: 'top', horizontal: 'left' },
 };
 
+const CheckItem = ({
+  checked,
+  secondary,
+  children,
+  ...props
+}) => (
+  <MenuItem role="menuitemcheckbox" aria-checked={checked} {...props}>
+    <ListItemIcon>
+      {checked ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
+    </ListItemIcon>
+    <ListItemText secondary={secondary}>{children}</ListItemText>
+  </MenuItem>
+);
+
 // An account or a track in the layers submenu
 const LayerItem = ({
   id,
@@ -39,12 +54,9 @@ const LayerItem = ({
   enabled,
   onToggle,
 }) => (
-  <MenuItem role="menuitemcheckbox" aria-checked={enabled} onClick={() => onToggle([id], !enabled)}>
-    <ListItemIcon>
-      {enabled ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
-    </ListItemIcon>
-    <ListItemText secondary={detail}>{label}</ListItemText>
-  </MenuItem>
+  <CheckItem checked={enabled} secondary={detail} onClick={() => onToggle([id], !enabled)}>
+    {label}
+  </CheckItem>
 );
 
 // Opened by a right click (or a long press) on the map
@@ -70,10 +82,12 @@ const MapContextMenu = ({
 }) => {
   const [basemapsAnchor, setBasemapsAnchor] = React.useState(null);
   const [layersAnchor, setLayersAnchor] = React.useState(null);
+  const [displayAnchor, setDisplayAnchor] = React.useState(null);
 
   const close = () => {
     setBasemapsAnchor(null);
     setLayersAnchor(null);
+    setDisplayAnchor(null);
     onClose();
   };
   // Pressing a submenu leaves the menu open, the other way round closes it
@@ -81,7 +95,7 @@ const MapContextMenu = ({
     open: Boolean(position),
     onClose: close,
     name: 'map',
-    inside: ['map', 'basemaps', 'layers'],
+    inside: ['map', 'basemaps', 'layers', 'display'],
   });
   const basemapsMenuProps = usePassThroughMenu({
     open: Boolean(basemapsAnchor),
@@ -92,6 +106,11 @@ const MapContextMenu = ({
     open: Boolean(layersAnchor),
     onClose: () => setLayersAnchor(null),
     name: 'layers',
+  });
+  const displayMenuProps = usePassThroughMenu({
+    open: Boolean(displayAnchor),
+    onClose: () => setDisplayAnchor(null),
+    name: 'display',
   });
 
   const layerItems = [...shareItems, ...trackItems];
@@ -143,43 +162,20 @@ const MapContextMenu = ({
           <ListItemText>Fond de carte</ListItemText>
           <ChevronRight fontSize="small" sx={{ ml: 2 }} />
         </MenuItem>
-        <MenuItem role="menuitemcheckbox" aria-checked={showGrid} onClick={onGridToggle}>
-          <ListItemIcon>
-            {showGrid ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
-          </ListItemIcon>
-          <ListItemText secondary="Masquée sous le zoom 10">Grille</ListItemText>
+        <MenuItem onClick={event => setDisplayAnchor(event.currentTarget)}>
+          <ListItemIcon><Visibility fontSize="small" /></ListItemIcon>
+          <ListItemText>Afficher</ListItemText>
+          <ChevronRight fontSize="small" sx={{ ml: 2 }} />
         </MenuItem>
         <Divider />
-        <MenuItem
-          role="menuitemcheckbox"
-          aria-checked={countActivities}
+        <CheckItem
+          checked={countActivities}
           disabled={!canCountActivities}
+          secondary={canCountActivities ? undefined : 'Mode Nombre uniquement'}
           onClick={onCountActivitiesToggle}
         >
-          <ListItemIcon>
-            {countActivities ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
-          </ListItemIcon>
-          <ListItemText secondary={canCountActivities ? undefined : 'Mode Nombre uniquement'}>
-            Compter les activités
-          </ListItemText>
-        </MenuItem>
-        {Object.entries(maxAreaLabels).map(([kind, label]) => (
-          // Left open, to toggle several areas in a row
-          <MenuItem
-            key={kind}
-            role="menuitemcheckbox"
-            aria-checked={Boolean(maxAreas[kind])}
-            disabled={!canShowMaxAreas}
-            onClick={() => onMaxAreaToggle(kind)}
-          >
-            <ListItemIcon>
-              {maxAreas[kind] ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
-            </ListItemIcon>
-            <ListItemText secondary={canShowMaxAreas ? undefined : 'Mode Compte uniquement'}>
-              {label}
-            </ListItemText>
-          </MenuItem>
-        ))}
+          Compter les activités
+        </CheckItem>
       </Menu>
 
       <Menu
@@ -201,6 +197,31 @@ const MapContextMenu = ({
             <ListItemIcon>{id === basemapId && <Check fontSize="small" />}</ListItemIcon>
             <ListItemText>{label}</ListItemText>
           </MenuItem>
+        ))}
+      </Menu>
+
+      {/* Left open, to toggle several items in a row */}
+      <Menu
+        {...displayMenuProps}
+        open={Boolean(displayAnchor)}
+        anchorEl={displayAnchor}
+        onClose={() => setDisplayAnchor(null)}
+        {...submenuOrigins}
+      >
+        <CheckItem checked={showGrid} secondary="Masquée sous le zoom 10" onClick={onGridToggle}>
+          Grille
+        </CheckItem>
+        <Divider />
+        {Object.entries(maxAreaLabels).map(([kind, label]) => (
+          <CheckItem
+            key={kind}
+            checked={Boolean(maxAreas[kind])}
+            disabled={!canShowMaxAreas}
+            secondary={canShowMaxAreas ? undefined : 'Mode Compte uniquement'}
+            onClick={() => onMaxAreaToggle(kind)}
+          >
+            {label}
+          </CheckItem>
         ))}
       </Menu>
 
