@@ -38,8 +38,14 @@ const useTracks = () => {
       let isCancelled = false;
       runInStore('readonly', store => store.get(storeKey))
         .then(stored => {
-          // Tracks added while loading come after the stored ones
-          if (!isCancelled && stored) { setTracks(previous => [...stored, ...previous]); }
+          // Tracks added while loading come after the stored ones. A rerun of
+          // the effect (Fast Refresh) finds them loaded already
+          if (!isCancelled && stored) {
+            setTracks(previous => [
+              ...stored,
+              ...previous.filter(({ id }) => !stored.some(track => track.id === id)),
+            ]);
+          }
         })
         // eslint-disable-next-line no-console
         .catch(error => console.error(error))
