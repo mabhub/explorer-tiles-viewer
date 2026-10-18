@@ -384,7 +384,7 @@ const Home = () => {
           trackItems={trackItems}
           onTracksToggle={handleTracksToggle}
         />
-        <LoadingStatus items={shareItems} queries={shareQueries} />
+        <LoadingStatus items={shareItems} queries={shareQueries} raised={isUndoShown} />
         <input
           ref={trackInputRef}
           type="file"

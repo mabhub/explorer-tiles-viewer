@@ -9,18 +9,26 @@ import {
 } from '@mui/material';
 import { Close, ErrorOutline } from '@mui/icons-material';
 
-const paperSx = {
+// Always mounted, so that screen readers announce its first content. Spans
+// the map width to center the badge, the map still gets the clicks around it.
+const getRegionSx = raised => ({
   position: 'absolute',
-  // Above the attribution of the bottom right corner, whatever its width
-  bottom: '2rem',
-  // Centered without left: 50%, which would cap its width to half the map
+  // Above the attribution of the bottom right corner, whatever its width,
+  // and above the undo snackbar while it is shown
+  bottom: raised ? '5.5rem' : '2rem',
   left: 0,
   right: 0,
-  mx: 'auto',
-  width: 'fit-content',
-  maxWidth: 'calc(100% - 2rem)',
+  display: 'flex',
+  justifyContent: 'center',
   // Over the map controls (z-index 2), such as the unfolded attribution on phones
   zIndex: 3,
+  pointerEvents: 'none',
+  transition: theme => theme.transitions.create('bottom'),
+});
+
+const paperSx = {
+  maxWidth: 'calc(100% - 2rem)',
+  pointerEvents: 'auto',
   px: 1.5,
   py: 0.5,
   fontSize: '0.875rem',
@@ -56,8 +64,9 @@ const FetchingRow = ({ title, shares, details }) => (
   </Stack>
 );
 
-// Shown over the map, panel collapsed or not, while accounts load
-const LoadingStatus = ({ items, queries }) => {
+// Shown over the map, panel collapsed or not, while accounts load.
+// raised: lifted above the undo snackbar.
+const LoadingStatus = ({ items, queries, raised = false }) => {
   // Failures that happened before the last close stay hidden
   const [closedAt, setClosedAt] = React.useState(0);
 
@@ -71,45 +80,49 @@ const LoadingStatus = ({ items, queries }) => {
   const failed = shares.filter(({ query }) =>
     query.isError && !query.isFetching && query.errorUpdatedAt > closedAt);
 
-  if (!fetching.length && !failed.length) { return null; }
+  const isShown = fetching.length > 0 || failed.length > 0;
 
   return (
-    <Paper elevation={3} sx={paperSx} role="status" aria-live="polite">
-      <Stack spacing={0.5}>
-        {loading.length > 0 && (
-          <FetchingRow title="Chargement" shares={loading} details={[getCountDetail, getTriesDetail]} />
-        )}
-        {updating.length > 0 && (
-          <FetchingRow title="Mise à jour" shares={updating} details={[getTriesDetail]} />
-        )}
-        {failed.length > 0 && (
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <ErrorOutline color="error" sx={{ fontSize: 16, flexShrink: 0 }} />
-            <span>
-              {failed.every(({ query }) => query.isComplete)
-                ? 'Échec de la mise à jour'
-                : 'Échec du chargement'}
-              {' : '}
-              <ShareLabels shares={failed} />
-            </span>
-            <Button
-              size="small"
-              onClick={() => failed.forEach(({ query }) => query.refetch())}
-            >
-              Réessayer
-            </Button>
-            <IconButton
-              size="small"
-              title="Fermer"
-              aria-label="Fermer"
-              onClick={() => setClosedAt(Date.now())}
-            >
-              <Close fontSize="inherit" />
-            </IconButton>
+    <Box sx={getRegionSx(raised)} role="status" aria-live="polite">
+      {isShown && (
+        <Paper elevation={3} sx={paperSx}>
+          <Stack spacing={0.5}>
+            {loading.length > 0 && (
+              <FetchingRow title="Chargement" shares={loading} details={[getCountDetail, getTriesDetail]} />
+            )}
+            {updating.length > 0 && (
+              <FetchingRow title="Mise à jour" shares={updating} details={[getTriesDetail]} />
+            )}
+            {failed.length > 0 && (
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <ErrorOutline color="error" sx={{ fontSize: 16, flexShrink: 0 }} />
+                <span>
+                  {failed.every(({ query }) => query.isComplete)
+                    ? 'Échec de la mise à jour'
+                    : 'Échec du chargement'}
+                  {' : '}
+                  <ShareLabels shares={failed} />
+                </span>
+                <Button
+                  size="small"
+                  onClick={() => failed.forEach(({ query }) => query.refetch())}
+                >
+                  Réessayer
+                </Button>
+                <IconButton
+                  size="small"
+                  title="Fermer"
+                  aria-label="Fermer"
+                  onClick={() => setClosedAt(Date.now())}
+                >
+                  <Close fontSize="inherit" />
+                </IconButton>
+              </Stack>
+            )}
           </Stack>
-        )}
-      </Stack>
-    </Paper>
+        </Paper>
+      )}
+    </Box>
   );
 };
 
