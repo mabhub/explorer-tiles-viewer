@@ -23,6 +23,7 @@ import {
 import { useMap } from 'react-map-gl/maplibre';
 import useLocalStorageState from 'use-local-storage-state';
 
+import LoadingStatus from './LoadingStatus';
 import MainMap from './MainMap';
 import ShareContextMenu from './ShareContextMenu';
 import ShareDialog from './ShareDialog';
@@ -383,6 +384,7 @@ const Home = () => {
           trackItems={trackItems}
           onTracksToggle={handleTracksToggle}
         />
+        <LoadingStatus items={shareItems} queries={shareQueries} />
         <input
           ref={trackInputRef}
           type="file"
@@ -505,10 +507,10 @@ const Home = () => {
                   >
                     <MoreVert sx={{ fontSize: 16 }} />
                   </IconButton>
-                  {shareQueries[index]?.isLoading && (
+                  {shareQueries[index]?.isFetching && (
                     <CircularProgress size={12} sx={{ ml: 1 }} />
                   )}
-                  {shareQueries[index]?.isError && (
+                  {shareQueries[index]?.isError && !shareQueries[index].isFetching && (
                     <IconButton
                       size="small"
                       color="error"

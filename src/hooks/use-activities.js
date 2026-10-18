@@ -32,8 +32,10 @@ const useActivities = shareIdsString => {
 
   const responses = useQueries({ queries });
 
-  const combinedStatus = responses.map?.(({ isLoading, isFetching, isError, isFetched }) =>
-    [isLoading, isFetching, isError, isFetched].map(b => b.toString()).join(',')).join(',');
+  // failureCount: retries are shown while loading
+  const combinedStatus = responses.map?.(({
+    isLoading, isFetching, isError, isFetched, failureCount,
+  }) => [isLoading, isFetching, isError, isFetched, failureCount].join(',')).join(',');
 
   const memoResponse = React.useMemo(
     () => responses,
