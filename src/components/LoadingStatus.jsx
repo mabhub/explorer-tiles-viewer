@@ -26,23 +26,33 @@ const paperSx = {
   fontSize: '0.875rem',
 };
 
-// Disabled accounts are grayed, retries counted from the 2nd try
-const ShareLabels = ({ shares, showTries }) => shares.map(({
-  id, label, enabled, query,
-}, index) => (
-  <React.Fragment key={id}>
-    {index > 0 && ', '}
-    <Box component="span" sx={enabled ? undefined : { color: 'text.disabled' }}>
-      {label}
-      {showTries && query.failureCount > 0 && ` (${query.failureCount + 1}e essai)`}
-    </Box>
-  </React.Fragment>
-));
+// Activities received so far, while the next pages load
+const getCountDetail = ({ data: [, activities = []] = [] }) => activities.length > 0
+  && `${activities.length.toLocaleString('fr-FR')} activités`;
 
-const FetchingRow = ({ title, shares }) => (
+// Retries are counted from the 2nd try
+const getTriesDetail = ({ failureCount }) => failureCount > 0 && `${failureCount + 1}e essai`;
+
+// Disabled accounts are grayed
+const ShareLabels = ({ shares, details = [] }) => shares.map(({
+  id, label, enabled, query,
+}, index) => {
+  const detail = details.map(getDetail => getDetail(query)).filter(Boolean).join(', ');
+  return (
+    <React.Fragment key={id}>
+      {index > 0 && ', '}
+      <Box component="span" sx={enabled ? undefined : { color: 'text.disabled' }}>
+        {label}
+        {detail && ` (${detail})`}
+      </Box>
+    </React.Fragment>
+  );
+});
+
+const FetchingRow = ({ title, shares, details }) => (
   <Stack direction="row" alignItems="center" spacing={1}>
     <CircularProgress size={14} sx={{ flexShrink: 0 }} />
-    <span>{title} : <ShareLabels shares={shares} showTries />…</span>
+    <span>{title} : <ShareLabels shares={shares} details={details} />…</span>
   </Stack>
 );
 
@@ -55,8 +65,9 @@ const LoadingStatus = ({ items, queries }) => {
     .map((item, index) => ({ ...item, query: queries[index] }))
     .filter(({ query }) => query);
   const fetching = shares.filter(({ query }) => query.isFetching);
-  const loading = fetching.filter(({ query }) => query.data === undefined);
-  const updating = fetching.filter(({ query }) => query.data !== undefined);
+  // Loading until the last page is there, even if the first ones are shown
+  const loading = fetching.filter(({ query }) => !query.isComplete);
+  const updating = fetching.filter(({ query }) => query.isComplete);
   const failed = shares.filter(({ query }) =>
     query.isError && !query.isFetching && query.errorUpdatedAt > closedAt);
 
@@ -65,13 +76,17 @@ const LoadingStatus = ({ items, queries }) => {
   return (
     <Paper elevation={3} sx={paperSx} role="status" aria-live="polite">
       <Stack spacing={0.5}>
-        {loading.length > 0 && <FetchingRow title="Chargement" shares={loading} />}
-        {updating.length > 0 && <FetchingRow title="Mise à jour" shares={updating} />}
+        {loading.length > 0 && (
+          <FetchingRow title="Chargement" shares={loading} details={[getCountDetail, getTriesDetail]} />
+        )}
+        {updating.length > 0 && (
+          <FetchingRow title="Mise à jour" shares={updating} details={[getTriesDetail]} />
+        )}
         {failed.length > 0 && (
           <Stack direction="row" alignItems="center" spacing={1}>
             <ErrorOutline color="error" sx={{ fontSize: 16, flexShrink: 0 }} />
             <span>
-              {failed.every(({ query }) => query.data !== undefined)
+              {failed.every(({ query }) => query.isComplete)
                 ? 'Échec de la mise à jour'
                 : 'Échec du chargement'}
               {' : '}

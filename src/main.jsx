@@ -42,7 +42,7 @@ const persistOptions = {
   // the last data, shown on the map until then
   dehydrateOptions: { shouldDehydrateQuery: query => query.state.data !== undefined },
   // To bump when the shape of fetched data changes: drops the stored one
-  buster: '1',
+  buster: '2',
 };
 
 const theme = responsiveFontSizes(createTheme({

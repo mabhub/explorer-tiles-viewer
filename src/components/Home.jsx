@@ -514,7 +514,7 @@ const Home = () => {
                     <IconButton
                       size="small"
                       color="error"
-                      title={shareQueries[index].data
+                      title={shareQueries[index].isComplete
                         ? 'Échec de la mise à jour, réessayer'
                         : 'Échec du chargement, réessayer'}
                       onClick={() => shareQueries[index].refetch()}
