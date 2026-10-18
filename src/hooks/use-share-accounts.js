@@ -19,7 +19,6 @@ const useShareAccounts = shareIds => useQueries({
   queries: shareIds.map(shareId => ({
     queryKey: ['account', shareId],
     queryFn: () => getAccount(shareId),
-    staleTime: Infinity,
     enabled: Boolean(endpoint),
   })),
 });

@@ -61,14 +61,15 @@ const MainMap = ({
   const [shares] = useShares();
 
   const shareIds = Object.keys(shares).join(',');
+  // A failed refresh keeps the last data: shares are drawn as long as they have some
   const allActivitiesQueries = useActivities(shareIds);
 
   const allTiles = React.useMemo(
     () => {
       const store = {};
 
-      allActivitiesQueries.forEach(({ data: [id, activities] = [], status }) => {
-        if (status !== 'success' || !isShareActive(shares[id])) { return; }
+      allActivitiesQueries.forEach(({ data: [id, activities] = [] }) => {
+        if (!activities || !isShareActive(shares[id])) { return; }
 
         activities.forEach(activity => {
           const { user_id: userId, tiles } = activity;
@@ -120,8 +121,8 @@ const MainMap = ({
       }
 
       const people = {};
-      allActivitiesQueries.forEach(({ data: [id, activities] = [], status }) => {
-        if (status !== 'success' || !isShareActive(shares[id])) { return; }
+      allActivitiesQueries.forEach(({ data: [id, activities] = [] }) => {
+        if (!activities || !isShareActive(shares[id])) { return; }
         activities.forEach(({ user_id: userId, tiles }) => {
           // A plain object: Map is the map component in this module
           if (!people[userId]) { people[userId] = { shareId: id, tiles: {} }; }

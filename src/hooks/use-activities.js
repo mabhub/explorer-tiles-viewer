@@ -25,7 +25,6 @@ const useActivities = shareIdsString => {
       return ids.map(shareId => ({
         queryKey: [shareId],
         queryFn: () => getActivities(shareId),
-        staleTime: Infinity,
       }));
     },
     [shareIdsString],

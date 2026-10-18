@@ -512,7 +512,9 @@ const Home = () => {
                     <IconButton
                       size="small"
                       color="error"
-                      title="Échec du chargement, réessayer"
+                      title={shareQueries[index].data
+                        ? 'Échec de la mise à jour, réessayer'
+                        : 'Échec du chargement, réessayer'}
                       onClick={() => shareQueries[index].refetch()}
                     >
                       <ErrorOutline fontSize="inherit" />
