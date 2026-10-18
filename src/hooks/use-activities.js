@@ -8,7 +8,10 @@ const getActivitiesPage = async (shareId, page) => {
   const url = `${import.meta.env.VITE_ACTIVITIES_ENDPOINT.replace('{{id}}', shareId)}/${page}`;
   const rawResponse = await fetch(url);
   if (!rawResponse.ok) {
-    throw new Error(`Failed to fetch activities page ${page} for ${shareId}: HTTP ${rawResponse.status}`);
+    throw Object.assign(
+      new Error(`Failed to fetch activities page ${page} for ${shareId}: HTTP ${rawResponse.status}`),
+      { status: rawResponse.status },
+    );
   }
   return rawResponse.json();
 };

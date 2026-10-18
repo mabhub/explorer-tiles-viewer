@@ -16,10 +16,15 @@ import App from './App';
 import { getValue, removeValue, setValue } from './key-value-store';
 
 // Shares change a few times a day at most: fetched data is refreshed in the
-// background once older than the CDN cache (15 min), and only when loaded
+// background once older than the CDN cache (15 min), and only when loaded.
+// A share Statshunters does not know (404) fails at once: retrying it is useless.
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 15 * 60 * 1000, refetchOnWindowFocus: false },
+    queries: {
+      staleTime:            15 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry:                (failureCount, error) => error.status !== 404 && failureCount < 3,
+    },
   },
 });
 

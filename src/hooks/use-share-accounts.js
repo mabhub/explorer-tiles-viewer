@@ -5,7 +5,10 @@ const endpoint = import.meta.env.VITE_ACCOUNT_ENDPOINT;
 const getAccount = async shareId => {
   const response = await fetch(endpoint.replace('{{id}}', shareId));
   if (!response.ok) {
-    throw new Error(`Failed to fetch account for ${shareId}: HTTP ${response.status}`);
+    throw Object.assign(
+      new Error(`Failed to fetch account for ${shareId}: HTTP ${response.status}`),
+      { status: response.status },
+    );
   }
   return response.json();
 };
