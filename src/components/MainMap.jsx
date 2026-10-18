@@ -33,6 +33,7 @@ const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxC
 
 const MainMap = ({
   tracks,
+  squadrats,
   colorMode,
   countActivities,
   onCountActivitiesToggle,
@@ -47,6 +48,9 @@ const MainMap = ({
   onSharesToggle,
   trackItems,
   onTracksToggle,
+  onSquadratsAdd,
+  squadratsItems,
+  onSquadratsToggle,
 }) => {
   const mapRef = React.useRef();
   // Labels of the basemap (vector ones only) to keep above the grid, looked up
@@ -316,6 +320,7 @@ const MainMap = ({
       <MapContent
         gridBefore={labelsLayer}
         tracks={tracks}
+        squadrats={squadrats}
         colorMode={colorMode}
         countActivities={countActivities}
         activePersonCount={activePersonCount}
@@ -363,6 +368,9 @@ const MainMap = ({
         onSharesToggle={onSharesToggle}
         trackItems={trackItems}
         onTracksToggle={onTracksToggle}
+        onSquadratsAdd={onSquadratsAdd}
+        squadratsItems={squadratsItems}
+        onSquadratsToggle={onSquadratsToggle}
       />
     </Map>
   );

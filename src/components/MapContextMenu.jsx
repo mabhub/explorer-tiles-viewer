@@ -12,6 +12,7 @@ import {
   CheckBox,
   CheckBoxOutlineBlank,
   ChevronRight,
+  GridView,
   Layers,
   Map as MapIcon,
   PersonAdd,
@@ -46,7 +47,7 @@ const CheckItem = ({
   </MenuItem>
 );
 
-// An account or a track in the layers submenu
+// An account, a track or a squadrats export in the layers submenu
 const LayerItem = ({
   id,
   label,
@@ -79,6 +80,9 @@ const MapContextMenu = ({
   onSharesToggle,
   trackItems,
   onTracksToggle,
+  onSquadratsAdd,
+  squadratsItems,
+  onSquadratsToggle,
 }) => {
   const [basemapsAnchor, setBasemapsAnchor] = React.useState(null);
   const [layersAnchor, setLayersAnchor] = React.useState(null);
@@ -113,10 +117,11 @@ const MapContextMenu = ({
     name: 'display',
   });
 
-  const layerItems = [...shareItems, ...trackItems];
+  const layerItems = [...shareItems, ...trackItems, ...squadratsItems];
   const toggleAll = enabled => {
     onSharesToggle(shareItems.map(({ id }) => id), enabled);
     onTracksToggle(trackItems.map(({ id }) => id), enabled);
+    onSquadratsToggle(squadratsItems.map(({ id }) => id), enabled);
   };
 
   return (
@@ -147,6 +152,15 @@ const MapContextMenu = ({
         >
           <ListItemIcon><AddRoad fontSize="small" /></ListItemIcon>
           <ListItemText>Ajouter une trace…</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            close();
+            onSquadratsAdd();
+          }}
+        >
+          <ListItemIcon><GridView fontSize="small" /></ListItemIcon>
+          <ListItemText>Ajouter un export squadrats…</ListItemText>
         </MenuItem>
         <MenuItem
           disabled={!layerItems.length}
@@ -252,6 +266,10 @@ const MapContextMenu = ({
         {trackItems.length > 0 && <Divider />}
         {trackItems.map(item => (
           <LayerItem key={item.id} {...item} onToggle={onTracksToggle} />
+        ))}
+        {squadratsItems.length > 0 && <Divider />}
+        {squadratsItems.map(item => (
+          <LayerItem key={item.id} {...item} onToggle={onSquadratsToggle} />
         ))}
       </Menu>
     </>

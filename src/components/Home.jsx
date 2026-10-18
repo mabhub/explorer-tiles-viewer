@@ -26,13 +26,15 @@ import useLocalStorageState from 'use-local-storage-state';
 import LoadingStatus from './LoadingStatus';
 import MainMap from './MainMap';
 import ShareContextMenu from './ShareContextMenu';
+import RenameDialog from './RenameDialog';
 import ShareDialog from './ShareDialog';
+import SquadratsContextMenu from './SquadratsContextMenu';
+import SquadratsDialog from './SquadratsDialog';
 import TrackContextMenu from './TrackContextMenu';
-import TrackDialog from './TrackDialog';
 import useActivities, { getPersonByShare } from '../hooks/use-activities';
 import useShareAccounts, { getAccountName } from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
-import useTracks from '../hooks/use-tracks';
+import useStoredList from '../hooks/use-stored-list';
 import {
   activityColors,
   activityThresholds,
@@ -44,6 +46,7 @@ import {
   pickShareColor,
   sharedColors,
 } from '../share-colors';
+import { formatExportDate, getSquadratinhosRings } from '../squadrats';
 import { getTrackBounds, parseTrack } from '../tracks';
 
 const globalStyles = { 'html, body, #root': { height: '100%' } };
@@ -102,13 +105,79 @@ const ShareName = ({
 };
 
 // Track names can be long activity names
-const trackNameSx = {
+const layerNameSx = {
   cursor: 'pointer',
   maxWidth: 240,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 };
+
+// A track or a squadrats export in the panel. The menu opens at (x, y).
+const LayerRow = ({
+  inputId,
+  name,
+  detail,
+  color,
+  enabled,
+  actionsTitle,
+  onToggle,
+  onColorChange,
+  onMenuOpen,
+}) => (
+  <Stack
+    direction="row"
+    alignItems="center"
+    onContextMenu={event => {
+      event.preventDefault();
+      onMenuOpen(event.clientX, event.clientY);
+    }}
+  >
+    <Switch
+      size="small"
+      inputProps={{ id: inputId }}
+      checked={enabled}
+      onChange={(event, checked) => onToggle(checked)}
+    />
+    <Box
+      component="input"
+      type="color"
+      value={color}
+      title="Changer la couleur"
+      aria-label={`Couleur de ${name}`}
+      onChange={event => onColorChange(event.target.value)}
+      sx={colorInputSx}
+    />
+    <Box component="label" htmlFor={inputId} title={name} sx={layerNameSx}>
+      {name}
+    </Box>
+    {detail && (
+      <Box component="small" sx={{ color: 'text.secondary', ml: 1, whiteSpace: 'nowrap' }}>
+        {detail}
+      </Box>
+    )}
+    <IconButton
+      size="small"
+      title={actionsTitle}
+      aria-label={`Actions de ${name}`}
+      onClick={event => {
+        const { left, bottom } = event.currentTarget.getBoundingClientRect();
+        onMenuOpen(left, bottom);
+      }}
+      sx={{ ml: 0.5, color: 'text.disabled' }}
+    >
+      <MoreVert sx={{ fontSize: 16 }} />
+    </IconButton>
+  </Stack>
+);
+
+// Updaters of a list of tracks or squadrats exports
+const updateItem = (id, changes) => items => items.map(
+  item => (item.id === id ? { ...item, ...changes } : item),
+);
+const toggleItems = (ids, enabled) => items => items.map(
+  item => (ids.includes(item.id) ? { ...item, disabled: !enabled } : item),
+);
 
 const colorModeTooltips = {
   count:      'Colore chaque tuile selon le nombre de personnes qui l\'ont visitée.',
@@ -131,7 +200,8 @@ const spaceTargets = 'input, textarea, select, button, summary, [role=button], .
 const Home = () => {
   const { main: map } = useMap();
   const [shares, setShares] = useShares();
-  const [tracks, setTracks] = useTracks();
+  const [tracks, setTracks] = useStoredList('tracks');
+  const [squadrats, setSquadrats] = useStoredList('squadrats');
   const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
   // Variant of the count coloring mode: activities instead of people
   const [countActivities, setCountActivities] = useLocalStorageState('countActivities', { defaultValue: false });
@@ -174,9 +244,13 @@ const Home = () => {
   const [hideShareIds, setHideShareIds] = useLocalStorageState('hideShareIds', { defaultValue: false });
   // Track whose context menu is open, and where: { id, x, y }
   const [trackMenu, setTrackMenu] = React.useState();
-  // Track renamed in its dialog, kept while the dialog fades out
-  const [dialogTrack, setDialogTrack] = React.useState();
-  const [isTrackDialogOpen, setIsTrackDialogOpen] = React.useState(false);
+  // Squadrats export whose context menu is open, and where: { id, x, y }
+  const [squadratsMenu, setSquadratsMenu] = React.useState();
+  const [isSquadratsDialogOpen, setIsSquadratsDialogOpen] = React.useState(false);
+  // Track or squadrats export renamed in the dialog, kept while the dialog
+  // fades out: { title, name, rename }
+  const [renamed, setRenamed] = React.useState();
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = React.useState(false);
   // Last deletion or color reset, undoable for a few seconds: { message, undo }.
   // Kept while the snackbar fades out.
   const [undoable, setUndoable] = React.useState();
@@ -228,10 +302,11 @@ const Home = () => {
     [setColorMode],
   );
 
-  // New shares and tracks get a color far from the ones of both
-  const getUsedColors = otherTracks => [
+  // New shares, tracks and squadrats exports get a color far from the ones of
+  // all of them
+  const getUsedColors = (otherTracks, otherSquadrats) => [
     ...Object.values(colorByShare),
-    ...otherTracks.map(({ color }) => color),
+    ...[...otherTracks, ...otherSquadrats].map(({ color }) => color),
   ];
 
   const handleUpload = event => {
@@ -244,7 +319,7 @@ const Home = () => {
           setTracks(prevTracks => [...prevTracks, {
             id: crypto.randomUUID(),
             name,
-            color: pickShareColor(getUsedColors(prevTracks)),
+            color: pickShareColor(getUsedColors(prevTracks, squadrats)),
             disabled: false,
             lines,
           }]);
@@ -256,11 +331,7 @@ const Home = () => {
     input.value = '';
   };
 
-  const handleTrackChange = (id, changes) => {
-    setTracks(prevTracks => prevTracks.map(
-      track => (track.id === id ? { ...track, ...changes } : track),
-    ));
-  };
+  const handleTrackChange = (id, changes) => setTracks(updateItem(id, changes));
 
   // Tracks as listed in the panel, for the map context menu
   const trackItems = tracks.map(({ id, name, disabled }) => ({
@@ -269,11 +340,52 @@ const Home = () => {
     enabled: !disabled,
   }));
 
-  const handleTracksToggle = (ids, enabled) => {
-    setTracks(prevTracks => prevTracks.map(track => (ids.includes(track.id)
-      ? { ...track, disabled: !enabled }
-      : track)));
+  const handleTracksToggle = (ids, enabled) => setTracks(toggleItems(ids, enabled));
+
+  // An export of an account already listed replaces its data, the entry keeps
+  // its name, color and state
+  const handleSquadratsAdd = ({
+    accountId,
+    name,
+    timestamp,
+    geojson,
+  }) => {
+    setSquadrats(prevSquadrats => {
+      const listed = accountId && prevSquadrats.find(entry => entry.accountId === accountId);
+      if (listed) {
+        return prevSquadrats.map(entry => (entry === listed
+          ? { ...entry, timestamp, geojson }
+          : entry));
+      }
+      return [...prevSquadrats, {
+        id: crypto.randomUUID(),
+        accountId,
+        name,
+        color: pickShareColor(getUsedColors(tracks, prevSquadrats)),
+        disabled: false,
+        timestamp,
+        geojson,
+      }];
+    });
+    setIsSquadratsDialogOpen(false);
   };
+
+  const handleSquadratsChange = (id, changes) => setSquadrats(updateItem(id, changes));
+
+  // Squadrats exports as listed in the panel, for the map context menu
+  const squadratsItems = squadrats.map(({
+    id,
+    name,
+    disabled,
+    timestamp,
+  }) => ({
+    id,
+    label: name,
+    detail: timestamp ? formatExportDate(timestamp) : undefined,
+    enabled: !disabled,
+  }));
+
+  const handleSquadratsToggle = (ids, enabled) => setSquadrats(toggleItems(ids, enabled));
 
   const handleSharesToggle = React.useCallback(
     (ids, enabled) => {
@@ -330,6 +442,22 @@ const Home = () => {
     map?.fitBounds(getTrackBounds(lines), { padding: 60, maxZoom: 15 });
   };
 
+  const handleSquadratsDelete = id => {
+    const previousSquadrats = squadrats;
+    offerUndo('Squadrats supprimés', () => setSquadrats(previousSquadrats));
+    setSquadrats(prevSquadrats => prevSquadrats.filter(entry => entry.id !== id));
+  };
+
+  const handleSquadratsFit = id => {
+    const { geojson } = squadrats.find(entry => entry.id === id);
+    map?.fitBounds(getTrackBounds(getSquadratinhosRings(geojson)), { padding: 60, maxZoom: 15 });
+  };
+
+  const openRenameDialog = (title, name, rename) => {
+    setRenamed({ title, name, rename });
+    setIsRenameDialogOpen(true);
+  };
+
   // Back to the palette, by position in the list
   const handleColorsReset = () => {
     const previousShares = shares;
@@ -342,7 +470,7 @@ const Home = () => {
   const handleShareSubmit = ({ id, alias }) => {
     setShares(prevShares => {
       const share = prevShares[id]
-        ?? { disabled: false, color: pickShareColor(getUsedColors(tracks)) };
+        ?? { disabled: false, color: pickShareColor(getUsedColors(tracks, squadrats)) };
       // Emptied when editing, the alias falls back to the Statshunters name;
       // adding an existing share again keeps it
       const newAlias = alias || (dialogShare ? undefined : share.alias);
@@ -369,6 +497,7 @@ const Home = () => {
       <Box sx={wrapperSx}>
         <MainMap
           tracks={tracks}
+          squadrats={squadrats}
           colorMode={colorMode}
           countActivities={countActivities}
           onCountActivitiesToggle={() => setCountActivities(previous => !previous)}
@@ -383,6 +512,9 @@ const Home = () => {
           onTrackAdd={() => trackInputRef.current.click()}
           trackItems={trackItems}
           onTracksToggle={handleTracksToggle}
+          onSquadratsAdd={() => setIsSquadratsDialogOpen(true)}
+          squadratsItems={squadratsItems}
+          onSquadratsToggle={handleSquadratsToggle}
         />
         <LoadingStatus items={shareItems} queries={shareQueries} raised={isUndoShown} />
         <input
@@ -540,46 +672,37 @@ const Home = () => {
                   color,
                   disabled,
                 }) => (
-                  <Stack
+                  <LayerRow
                     key={id}
-                    direction="row"
-                    alignItems="center"
-                    onContextMenu={event => {
-                      event.preventDefault();
-                      setTrackMenu({ id, x: event.clientX, y: event.clientY });
-                    }}
-                  >
-                    <Switch
-                      size="small"
-                      inputProps={{ id: `track-${id}` }}
-                      checked={!disabled}
-                      onChange={(event, checked) => handleTracksToggle([id], checked)}
-                    />
-                    <Box
-                      component="input"
-                      type="color"
-                      value={color}
-                      title="Changer la couleur"
-                      aria-label={`Couleur de ${name}`}
-                      onChange={event => handleTrackChange(id, { color: event.target.value })}
-                      sx={colorInputSx}
-                    />
-                    <Box component="label" htmlFor={`track-${id}`} title={name} sx={trackNameSx}>
-                      {name}
-                    </Box>
-                    <IconButton
-                      size="small"
-                      title="Actions de la trace"
-                      aria-label={`Actions de ${name}`}
-                      onClick={event => {
-                        const { left, bottom } = event.currentTarget.getBoundingClientRect();
-                        setTrackMenu({ id, x: left, y: bottom });
-                      }}
-                      sx={{ ml: 0.5, color: 'text.disabled' }}
-                    >
-                      <MoreVert sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </Stack>
+                    inputId={`track-${id}`}
+                    name={name}
+                    color={color}
+                    enabled={!disabled}
+                    actionsTitle="Actions de la trace"
+                    onToggle={checked => handleTracksToggle([id], checked)}
+                    onColorChange={value => handleTrackChange(id, { color: value })}
+                    onMenuOpen={(x, y) => setTrackMenu({ id, x, y })}
+                  />
+                ))}
+              </Stack>
+            )}
+
+            {squadrats.length > 0 && (
+              <Stack sx={{ mb: 1 }}>
+                <Box component="small" sx={{ color: 'text.secondary', pl: 1 }}>Squadrats</Box>
+                {squadratsItems.map(({ id, label, detail }, index) => (
+                  <LayerRow
+                    key={id}
+                    inputId={`squadrats-${id}`}
+                    name={label}
+                    detail={detail}
+                    color={squadrats[index].color}
+                    enabled={!squadrats[index].disabled}
+                    actionsTitle="Actions des squadrats"
+                    onToggle={checked => handleSquadratsToggle([id], checked)}
+                    onColorChange={value => handleSquadratsChange(id, { color: value })}
+                    onMenuOpen={(x, y) => setSquadratsMenu({ id, x, y })}
+                  />
                 ))}
               </Stack>
             )}
@@ -661,20 +784,38 @@ const Home = () => {
             onClose={() => setTrackMenu()}
             onFit={() => handleTrackFit(trackMenu.id)}
             onRename={() => {
-              setDialogTrack(tracks.find(track => track.id === trackMenu.id));
-              setIsTrackDialogOpen(true);
+              const { id, name } = tracks.find(track => track.id === trackMenu.id);
+              openRenameDialog('Renommer la trace', name, newName => handleTrackChange(id, { name: newName }));
             }}
             onDelete={() => handleTrackDelete(trackMenu.id)}
           />
 
-          <TrackDialog
-            open={isTrackDialogOpen}
-            track={dialogTrack}
-            onClose={() => setIsTrackDialogOpen(false)}
-            onSubmit={name => {
-              handleTrackChange(dialogTrack.id, { name });
-              setIsTrackDialogOpen(false);
+          <SquadratsContextMenu
+            position={squadratsMenu}
+            onClose={() => setSquadratsMenu()}
+            onFit={() => handleSquadratsFit(squadratsMenu.id)}
+            onRename={() => {
+              const { id, name } = squadrats.find(entry => entry.id === squadratsMenu.id);
+              openRenameDialog('Renommer les squadrats', name, newName => handleSquadratsChange(id, { name: newName }));
             }}
+            onDelete={() => handleSquadratsDelete(squadratsMenu.id)}
+          />
+
+          <RenameDialog
+            open={isRenameDialogOpen}
+            title={renamed?.title}
+            name={renamed?.name}
+            onClose={() => setIsRenameDialogOpen(false)}
+            onSubmit={name => {
+              renamed.rename(name);
+              setIsRenameDialogOpen(false);
+            }}
+          />
+
+          <SquadratsDialog
+            open={isSquadratsDialogOpen}
+            onClose={() => setIsSquadratsDialogOpen(false)}
+            onAdd={handleSquadratsAdd}
           />
 
           <Snackbar

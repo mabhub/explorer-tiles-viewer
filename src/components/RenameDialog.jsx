@@ -7,19 +7,20 @@ import {
   TextField,
 } from '@mui/material';
 
-// Renames a track
-const TrackDialog = ({
+// Renames a track or a squadrats export
+const RenameDialog = ({
   open,
-  track,
+  title,
+  name,
   onClose,
   onSubmit,
 }) => {
   const handleSubmit = event => {
     event.preventDefault();
 
-    const name = new FormData(event.target).get('name').trim();
+    const newName = new FormData(event.target).get('name').trim();
     // Spaces pass the required check: a blank name keeps the current one
-    if (name) { onSubmit(name); } else { onClose(); }
+    if (newName) { onSubmit(newName); } else { onClose(); }
   };
 
   return (
@@ -30,7 +31,7 @@ const TrackDialog = ({
       maxWidth="xs"
       PaperProps={{ component: 'form', onSubmit: handleSubmit }}
     >
-      <DialogTitle>Renommer la trace</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <TextField
           autoFocus
@@ -39,7 +40,7 @@ const TrackDialog = ({
           margin="dense"
           name="name"
           label="Nom"
-          defaultValue={track?.name}
+          defaultValue={name}
         />
       </DialogContent>
       <DialogActions>
@@ -50,4 +51,4 @@ const TrackDialog = ({
   );
 };
 
-export default TrackDialog;
+export default RenameDialog;

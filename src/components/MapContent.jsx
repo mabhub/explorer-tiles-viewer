@@ -9,6 +9,7 @@ import {
   currentYear,
   sharedColors,
 } from '../share-colors';
+import { getSquadratinhos } from '../squadrats';
 import { getTrackGeojson } from '../tracks';
 
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
@@ -94,6 +95,7 @@ const MapContent = ({
   maxAreas,
   showGrid,
   tracks = [],
+  squadrats = [],
 }) => (
   <>
     <Source
@@ -127,6 +129,18 @@ const MapContent = ({
         paint={{ 'line-color': ['get', 'color'], 'line-width': 3 }}
       />
     </Source>
+
+    {/* Over the tiles, under the max areas and the tracks: placed before the
+        max areas, which exist first, whenever they are added */}
+    {squadrats.filter(({ disabled }) => !disabled).map(({ id, color, geojson }) => (
+      <Source key={id} type="geojson" data={getSquadratinhos(geojson)}>
+        <Layer
+          type="fill"
+          beforeId="max-areas"
+          paint={{ 'fill-color': color, 'fill-opacity': 0.35, 'fill-outline-color': color }}
+        />
+      </Source>
+    ))}
 
     {tracks.filter(({ disabled }) => !disabled).map(({ id, color, lines }) => (
       <Source key={id} type="geojson" data={getTrackGeojson(lines)}>
