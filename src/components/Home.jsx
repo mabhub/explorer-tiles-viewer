@@ -28,6 +28,7 @@ import LoadingStatus from './LoadingStatus';
 import MainMap from './MainMap';
 import ShareContextMenu from './ShareContextMenu';
 import RenameDialog from './RenameDialog';
+import { SortableGroup, SortableRow, reorderItems } from './SortableGroup';
 import ShareDialog from './ShareDialog';
 import SquadratsContextMenu from './SquadratsContextMenu';
 import SquadratsDialog from './SquadratsDialog';
@@ -128,6 +129,8 @@ const statusTitles = {
 // A track or a squadrats export in the panel. The menu opens at (x, y).
 // `status`: 'loading', 'error' or 'outdated' while a squadrats export refreshes
 const LayerRow = ({
+  id,
+  sortable,
   inputId,
   name,
   detail,
@@ -139,9 +142,10 @@ const LayerRow = ({
   onColorChange,
   onMenuOpen,
 }) => (
-  <Stack
-    direction="row"
-    alignItems="center"
+  <SortableRow
+    id={id}
+    label={name}
+    sortable={sortable}
     onContextMenu={event => {
       event.preventDefault();
       onMenuOpen(event.clientX, event.clientY);
@@ -192,7 +196,7 @@ const LayerRow = ({
     >
       <MoreVert sx={{ fontSize: 16 }} />
     </IconButton>
-  </Stack>
+  </SortableRow>
 );
 
 // Shows or hides the activity lines of an account, in the person color, grayed
@@ -667,6 +671,28 @@ const Home = () => {
     [setShares, firstShareByShare],
   );
 
+  // Names of the rows, for the screen reader announcements while reordering
+  const labelByShareId = Object.fromEntries(shareIdList.map(id => [id, getShareLabel(id)]));
+  const trackIds = tracks.map(({ id }) => id);
+  const trackLabels = Object.fromEntries(tracks.map(({ id, name }) => [id, name]));
+  const squadratsIds = squadratsItems.map(({ id }) => id);
+  const squadratsLabels = Object.fromEntries(squadratsItems.map(({ id, label }) => [id, label]));
+
+  // Palette colors go by position: each person keeps the color shown so far,
+  // stored on their first share in the new order
+  const handleSharesReorder = ids => {
+    const firstShares = getFirstShareByShare(ids, personByShare);
+    setShares(prevShares => Object.fromEntries([
+      ...ids.filter(id => prevShares[id]).map(id => [
+        id,
+        firstShares[id] === id ? { ...prevShares[id], color: colorByShare[id] } : prevShares[id],
+      ]),
+      ...Object.entries(prevShares).filter(([id]) => !ids.includes(id)),
+    ]));
+  };
+  const handleTracksReorder = ids => setTracks(reorderItems(ids));
+  const handleSquadratsReorder = ids => setSquadrats(reorderItems(ids));
+
   return (
     <>
       <GlobalStyles styles={globalStyles} />
@@ -775,80 +801,87 @@ const Home = () => {
             {/* Controls are siblings of the label, which only holds the name:
                 nested in it, they would leak into the switch accessible name */}
             <Stack sx={{ mb: 1 }}>
-              {Object.entries(shares).map(([id, { disabled, alias }], index) => (
-                <Stack
-                  key={id}
-                  direction="row"
-                  alignItems="center"
-                  onContextMenu={event => {
-                    event.preventDefault();
-                    setShareMenu({ id, x: event.clientX, y: event.clientY });
-                  }}
-                >
-                  <Switch
-                    size="small"
-                    inputProps={{ id }}
-                    checked={disabled !== true}
-                    onChange={handleShareClick}
-                  />
-                  {colorMode === 'owner' && (
-                    <Box
-                      component="input"
-                      type="color"
-                      value={colorByShare[id]}
-                      title="Changer la couleur"
-                      aria-label={`Couleur de ${getShareLabel(id)}`}
-                      onChange={event => handleColorChange(id, event.target.value)}
-                      sx={colorInputSx}
-                    />
-                  )}
-                  <Box component="label" htmlFor={id} sx={{ cursor: 'pointer' }}>
-                    <ShareName
-                      id={id}
-                      alias={alias}
-                      account={shareAccounts[index]?.data}
-                      hideId={hideShareIds}
-                    />
-                  </Box>
-                  {canShowLines(id) && (
-                    <LinesButton
-                      name={getShareLabel(id)}
-                      shown={Boolean(shares[id].showLines)}
-                      active={isShareActive(shares[id])}
-                      color={colorByShare[id]}
-                      query={linesQueryByShare[id]}
-                      onToggle={() => handleLinesToggle([id], !shares[id].showLines)}
-                    />
-                  )}
-                  <IconButton
-                    size="small"
-                    title="Actions du compte"
-                    aria-label={`Actions de ${getShareLabel(id)}`}
-                    onClick={event => {
-                      const { left, bottom } = event.currentTarget.getBoundingClientRect();
-                      setShareMenu({ id, x: left, y: bottom });
+              <SortableGroup
+                ids={shareIdList}
+                labels={labelByShareId}
+                onReorder={handleSharesReorder}
+              >
+                {Object.entries(shares).map(([id, { disabled, alias }], index) => (
+                  <SortableRow
+                    key={id}
+                    id={id}
+                    label={labelByShareId[id]}
+                    sortable={shareIdList.length > 1}
+                    onContextMenu={event => {
+                      event.preventDefault();
+                      setShareMenu({ id, x: event.clientX, y: event.clientY });
                     }}
-                    sx={{ ml: 0.5, color: 'text.disabled' }}
                   >
-                    <MoreVert sx={{ fontSize: 16 }} />
-                  </IconButton>
-                  {shareQueries[index]?.isFetching && (
-                    <CircularProgress size={12} sx={{ ml: 1 }} />
-                  )}
-                  {shareQueries[index]?.isError && !shareQueries[index].isFetching && (
+                    <Switch
+                      size="small"
+                      inputProps={{ id }}
+                      checked={disabled !== true}
+                      onChange={handleShareClick}
+                    />
+                    {colorMode === 'owner' && (
+                      <Box
+                        component="input"
+                        type="color"
+                        value={colorByShare[id]}
+                        title="Changer la couleur"
+                        aria-label={`Couleur de ${getShareLabel(id)}`}
+                        onChange={event => handleColorChange(id, event.target.value)}
+                        sx={colorInputSx}
+                      />
+                    )}
+                    <Box component="label" htmlFor={id} sx={{ cursor: 'pointer' }}>
+                      <ShareName
+                        id={id}
+                        alias={alias}
+                        account={shareAccounts[index]?.data}
+                        hideId={hideShareIds}
+                      />
+                    </Box>
+                    {canShowLines(id) && (
+                      <LinesButton
+                        name={getShareLabel(id)}
+                        shown={Boolean(shares[id].showLines)}
+                        active={isShareActive(shares[id])}
+                        color={colorByShare[id]}
+                        query={linesQueryByShare[id]}
+                        onToggle={() => handleLinesToggle([id], !shares[id].showLines)}
+                      />
+                    )}
                     <IconButton
                       size="small"
-                      color="error"
-                      title={shareQueries[index].isComplete
-                        ? 'Échec de la mise à jour, réessayer'
-                        : 'Échec du chargement, réessayer'}
-                      onClick={() => shareQueries[index].refetch()}
+                      title="Actions du compte"
+                      aria-label={`Actions de ${getShareLabel(id)}`}
+                      onClick={event => {
+                        const { left, bottom } = event.currentTarget.getBoundingClientRect();
+                        setShareMenu({ id, x: left, y: bottom });
+                      }}
+                      sx={{ ml: 0.5, color: 'text.disabled' }}
                     >
-                      <ErrorOutline fontSize="inherit" />
+                      <MoreVert sx={{ fontSize: 16 }} />
                     </IconButton>
-                  )}
-                </Stack>
-              ))}
+                    {shareQueries[index]?.isFetching && (
+                      <CircularProgress size={12} sx={{ ml: 1 }} />
+                    )}
+                    {shareQueries[index]?.isError && !shareQueries[index].isFetching && (
+                      <IconButton
+                        size="small"
+                        color="error"
+                        title={shareQueries[index].isComplete
+                          ? 'Échec de la mise à jour, réessayer'
+                          : 'Échec du chargement, réessayer'}
+                        onClick={() => shareQueries[index].refetch()}
+                      >
+                        <ErrorOutline fontSize="inherit" />
+                      </IconButton>
+                    )}
+                  </SortableRow>
+                ))}
+              </SortableGroup>
               {!shareIdList.length && (
                 <Box component="small" sx={{ color: 'text.secondary', pl: 1 }}>
                   Aucun compte : menu ⋮ puis « Ajouter un compte… »
@@ -859,45 +892,57 @@ const Home = () => {
             {tracks.length > 0 && (
               <Stack sx={{ mb: 1 }}>
                 <Box component="small" sx={{ color: 'text.secondary', pl: 1 }}>Traces</Box>
-                {tracks.map(({
-                  id,
-                  name,
-                  color,
-                  disabled,
-                }) => (
-                  <LayerRow
-                    key={id}
-                    inputId={`track-${id}`}
-                    name={name}
-                    color={color}
-                    enabled={!disabled}
-                    actionsTitle="Actions de la trace"
-                    onToggle={checked => handleTracksToggle([id], checked)}
-                    onColorChange={value => handleTrackChange(id, { color: value })}
-                    onMenuOpen={(x, y) => setTrackMenu({ id, x, y })}
-                  />
-                ))}
+                <SortableGroup ids={trackIds} labels={trackLabels} onReorder={handleTracksReorder}>
+                  {tracks.map(({
+                    id,
+                    name,
+                    color,
+                    disabled,
+                  }) => (
+                    <LayerRow
+                      key={id}
+                      id={id}
+                      sortable={tracks.length > 1}
+                      inputId={`track-${id}`}
+                      name={name}
+                      color={color}
+                      enabled={!disabled}
+                      actionsTitle="Actions de la trace"
+                      onToggle={checked => handleTracksToggle([id], checked)}
+                      onColorChange={value => handleTrackChange(id, { color: value })}
+                      onMenuOpen={(x, y) => setTrackMenu({ id, x, y })}
+                    />
+                  ))}
+                </SortableGroup>
               </Stack>
             )}
 
             {squadrats.length > 0 && (
               <Stack sx={{ mb: 1 }}>
                 <Box component="small" sx={{ color: 'text.secondary', pl: 1 }}>Squadrats</Box>
-                {squadratsItems.map(({ id, label, detail }, index) => (
-                  <LayerRow
-                    key={id}
-                    inputId={`squadrats-${id}`}
-                    name={label}
-                    detail={detail}
-                    status={squadratsStatuses[id]}
-                    color={squadrats[index].color}
-                    enabled={!squadrats[index].disabled}
-                    actionsTitle="Actions des squadrats"
-                    onToggle={checked => handleSquadratsToggle([id], checked)}
-                    onColorChange={value => handleSquadratsChange(id, { color: value })}
-                    onMenuOpen={(x, y) => setSquadratsMenu({ id, x, y })}
-                  />
-                ))}
+                <SortableGroup
+                  ids={squadratsIds}
+                  labels={squadratsLabels}
+                  onReorder={handleSquadratsReorder}
+                >
+                  {squadratsItems.map(({ id, label, detail }, index) => (
+                    <LayerRow
+                      key={id}
+                      id={id}
+                      sortable={squadrats.length > 1}
+                      inputId={`squadrats-${id}`}
+                      name={label}
+                      detail={detail}
+                      status={squadratsStatuses[id]}
+                      color={squadrats[index].color}
+                      enabled={!squadrats[index].disabled}
+                      actionsTitle="Actions des squadrats"
+                      onToggle={checked => handleSquadratsToggle([id], checked)}
+                      onColorChange={value => handleSquadratsChange(id, { color: value })}
+                      onMenuOpen={(x, y) => setSquadratsMenu({ id, x, y })}
+                    />
+                  ))}
+                </SortableGroup>
               </Stack>
             )}
 
