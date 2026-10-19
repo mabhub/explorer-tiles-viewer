@@ -60,6 +60,7 @@ const MainMap = ({
   const basemap = getBasemap(basemapId);
   const [maxAreas, setMaxAreas] = useLocalStorageState('maxAreas', { defaultValue: noMaxAreas });
   const [showGrid, setShowGrid] = useLocalStorageState('showGrid', { defaultValue: true });
+  const [showSquadratinhosGrid, setShowSquadratinhosGrid] = useLocalStorageState('squadratinhosGrid', { defaultValue: false });
   const [activeTile, setActiveTile] = React.useState();
   const [cadastre] = React.useState(false);
   const [shares] = useShares();
@@ -326,6 +327,7 @@ const MainMap = ({
         activePersonCount={activePersonCount}
         maxAreas={maxAreaFeatures}
         showGrid={showGrid}
+        showSquadratinhosGrid={showSquadratinhosGrid}
       />
       {activeTileData && (
         <Popup
@@ -359,6 +361,8 @@ const MainMap = ({
         canShowMaxAreas={colorMode === 'owner'}
         showGrid={showGrid}
         onGridToggle={() => setShowGrid(previous => !previous)}
+        showSquadratinhosGrid={showSquadratinhosGrid}
+        onSquadratinhosGridToggle={() => setShowSquadratinhosGrid(previous => !previous)}
         countActivities={countActivities}
         onCountActivitiesToggle={onCountActivitiesToggle}
         canCountActivities={colorMode === 'count'}

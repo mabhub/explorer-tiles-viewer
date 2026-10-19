@@ -21,6 +21,7 @@ import {
 
 import basemaps from '../basemaps';
 import usePassThroughMenu from '../hooks/use-pass-through-menu';
+import { squadratinhosGridMinZoom } from './SquadratinhosGrid';
 
 const maxAreaLabels = {
   square: 'Max square',
@@ -71,6 +72,8 @@ const MapContextMenu = ({
   canShowMaxAreas,
   showGrid,
   onGridToggle,
+  showSquadratinhosGrid,
+  onSquadratinhosGridToggle,
   countActivities,
   onCountActivitiesToggle,
   canCountActivities,
@@ -224,6 +227,13 @@ const MapContextMenu = ({
       >
         <CheckItem checked={showGrid} secondary="Masquée sous le zoom 10" onClick={onGridToggle}>
           Grille
+        </CheckItem>
+        <CheckItem
+          checked={showSquadratinhosGrid}
+          secondary={`À partir du zoom ${squadratinhosGridMinZoom}`}
+          onClick={onSquadratinhosGridToggle}
+        >
+          Grille squadratinhos
         </CheckItem>
         <Divider />
         {Object.entries(maxAreaLabels).map(([kind, label]) => (

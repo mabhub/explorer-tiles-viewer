@@ -11,6 +11,7 @@ import {
 } from '../share-colors';
 import { getLiveTilesUrl, getSquadratinhos, liveTilesMaxZoom } from '../squadrats';
 import { getTrackGeojson } from '../tracks';
+import SquadratinhosGrid from './SquadratinhosGrid';
 
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
 
@@ -94,6 +95,7 @@ const MapContent = ({
   activePersonCount,
   maxAreas,
   showGrid,
+  showSquadratinhosGrid,
   tracks = [],
   squadrats = [],
 }) => (
@@ -164,6 +166,8 @@ const MapContent = ({
         </Source>
       );
     })}
+
+    {showSquadratinhosGrid && <SquadratinhosGrid />}
 
     {tracks.filter(({ disabled }) => !disabled).map(({ id, color, lines }) => (
       <Source key={id} type="geojson" data={getTrackGeojson(lines)}>
