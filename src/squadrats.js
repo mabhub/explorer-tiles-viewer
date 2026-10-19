@@ -13,6 +13,14 @@ const getTimestampsUrl = accountId => `https://tiles-beta.squadrats.com/${accoun
 // Servers of the browser extension of squadrats.com, also anonymous and open
 // to any origin: they list the tiles of the trophies
 const extensionServers = ['https://mainframe-proxy-01.squadrats.com', 'https://mainframe-proxy-02.squadrats.com'];
+// A squadrat of their answer: "x-y" (zoom 14)
+const squadratPattern = /^\d+-\d+$/;
+
+// Small answers come quickly, or not at all when a server is down: no need to
+// wait for the browser to give up. Exports and tiles lists weigh up to 1 MB.
+const answerTimeout = 15000;
+const downloadTimeout = 60000;
+const fetchWithin = (url, timeout) => fetch(url, { signal: AbortSignal.timeout(timeout) });
 
 export const getLiveTilesUrl = (accountId, timestamp) => `https://tiles-beta.squadrats.com/${accountId}/trophies-earth/${timestamp}/{z}/{x}/{y}.pbf`;
 // Deeper zooms show the tiles of this one
@@ -50,39 +58,47 @@ export const parseExport = text => {
 };
 
 export const fetchExport = async (accountId, timestamp) => {
-  const response = await fetch(getExportUrl(accountId, timestamp));
+  const response = await fetchWithin(getExportUrl(accountId, timestamp), downloadTimeout);
   if (!response.ok) { throw new Error(`Export unavailable (${response.status})`); }
   return parseExport(await response.text());
 };
 
 // Timestamp of the latest computation of the trophies of the account, worldwide
 export const fetchLatestTimestamp = async accountId => {
-  const response = await fetch(getTimestampsUrl(accountId));
+  const response = await fetchWithin(getTimestampsUrl(accountId), answerTimeout);
   if (!response.ok) { throw new Error(`Timestamps unavailable (${response.status})`); }
   const { earth } = await response.json();
   if (!Number.isInteger(earth)) { throw new Error('No worldwide timestamp'); }
   return earth;
 };
 
-const fetchSquadratTilesFrom = async (server, accountId) => {
-  const response = await fetch(`${server}/anonymous/squadrants/${accountId}`);
+// Tried in turn, the servers share the delay of one download
+const fetchSquadrantFrom = async (server, accountId) => {
+  const response = await fetchWithin(
+    `${server}/anonymous/squadrants/${accountId}`,
+    downloadTimeout / extensionServers.length,
+  );
   if (!response.ok) { throw new Error(`Squadrats unavailable (${response.status})`); }
-  const { raw } = await response.json();
-  if (!Array.isArray(raw?.[14])) { throw new Error('No squadrats in the response'); }
-  return raw[14];
+  const { raw, geojson } = await response.json();
+  // Stored, then read while rendering: an unexpected shape must not get in
+  if (!Array.isArray(raw?.[14]) || !raw[14].every(tile => squadratPattern.test(tile))) {
+    throw new Error('No squadrats in the response');
+  }
+  return { squadratTiles: raw[14], timestamp: parseExportLink(geojson ?? '')?.timestamp };
 };
 
-// Squadrats (zoom 14 tiles) of the account, as "x-y": from a server picked at
+// Squadrats (zoom 14 tiles) of the account, as "x-y", and the timestamp of
+// their computation, the name of its latest export: from a server picked at
 // random, the other one if it fails
-export const fetchSquadratTiles = accountId => {
+export const fetchSquadrant = accountId => {
   const first = Math.floor(Math.random() * extensionServers.length);
-  return fetchSquadratTilesFrom(extensionServers[first], accountId)
-    .catch(() => fetchSquadratTilesFrom(extensionServers[1 - first], accountId));
+  return fetchSquadrantFrom(extensionServers[first], accountId)
+    .catch(() => fetchSquadrantFrom(extensionServers[1 - first], accountId));
 };
 
 // Public first and last name of the account
 export const fetchAccountName = async accountId => {
-  const response = await fetch(getAccountUrl(accountId));
+  const response = await fetchWithin(getAccountUrl(accountId), answerTimeout);
   if (!response.ok) { throw new Error(`Account unavailable (${response.status})`); }
   const { firstname, lastname } = await response.json();
   return [firstname, lastname].filter(Boolean).join(' ');

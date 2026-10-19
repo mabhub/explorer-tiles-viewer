@@ -4,7 +4,7 @@ import {
   fetchAccountName,
   fetchExport,
   fetchLatestTimestamp,
-  fetchSquadratTiles,
+  fetchSquadrant,
 } from '../squadrats';
 import { updateItem } from './use-stored-list';
 
@@ -38,7 +38,17 @@ const useSquadratsRefresh = (squadrats, setSquadrats, isLoaded) => {
       try {
         // Kept even if the export fails: live tiles still follow it. Unchanged,
         // the list is not saved again with its exports
-        const latest = await fetchLatestTimestamp(accountId);
+        let latest;
+        let squadrant;
+        try {
+          latest = await fetchLatestTimestamp(accountId);
+        } catch (error) {
+          // The tile servers may be down: the server of the browser extension
+          // also tells the latest computation, by the name of its export
+          squadrant = await fetchSquadrant(accountId).catch(() => { throw error; });
+          latest = squadrant.timestamp;
+          if (!latest) { throw error; }
+        }
         if (latest !== knownLatest) { update({ latest }); }
         // Each one is kept, whether the others fail or not
         const downloads = [
@@ -47,7 +57,7 @@ const useSquadratsRefresh = (squadrats, setSquadrats, isLoaded) => {
             geojson:   await fetchExport(accountId, latest),
           })),
           latest !== squadratTilesTimestamp && (async () => update({
-            squadratTiles:          await fetchSquadratTiles(accountId),
+            squadratTiles:          (squadrant ?? await fetchSquadrant(accountId)).squadratTiles,
             squadratTilesTimestamp: latest,
           })),
           accountName === undefined && (async () => update({
