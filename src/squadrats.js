@@ -1,12 +1,18 @@
 // squadrats.com publishes, for each account, a GeoJSON export of its trophies,
 // public and readable from any origin. Its name is the timestamp (ms) of the
-// computation of the trophies.
+// computation of the trophies, made again after each change of activities.
+// The same trophies are served as vector tiles, the ones its map draws.
 const exportLinkPattern = /^https:\/\/squadrats\.org\/trophies\/(\w+)\/(\d+)\.geojson$/;
 // The name of a downloaded export
 const exportFilePattern = /^(\d+)\.geojson$/i;
 
 const getExportUrl = (accountId, timestamp) => `https://squadrats.org/trophies/${accountId}/${timestamp}.geojson`;
 const getAccountUrl = accountId => `https://mainframe-api.squadrats.com/anonymous/squadrants/${accountId}/trophies`;
+const getTimestampsUrl = accountId => `https://tiles-beta.squadrats.com/${accountId}/trophies/timestamps`;
+
+export const getLiveTilesUrl = (accountId, timestamp) => `https://tiles-beta.squadrats.com/${accountId}/trophies-earth/${timestamp}/{z}/{x}/{y}.pbf`;
+// Deeper zooms show the tiles of this one
+export const liveTilesMaxZoom = 12;
 
 // { accountId, timestamp } of an export link, none if it is not one
 export const parseExportLink = link => {
@@ -43,6 +49,15 @@ export const fetchExport = async (accountId, timestamp) => {
   const response = await fetch(getExportUrl(accountId, timestamp));
   if (!response.ok) { throw new Error(`Export unavailable (${response.status})`); }
   return parseExport(await response.text());
+};
+
+// Timestamp of the latest computation of the trophies of the account, worldwide
+export const fetchLatestTimestamp = async accountId => {
+  const response = await fetch(getTimestampsUrl(accountId));
+  if (!response.ok) { throw new Error(`Timestamps unavailable (${response.status})`); }
+  const { earth } = await response.json();
+  if (!Number.isInteger(earth)) { throw new Error('No worldwide timestamp'); }
+  return earth;
 };
 
 // Public first and last name of the account

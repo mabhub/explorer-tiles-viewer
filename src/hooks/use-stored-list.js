@@ -5,9 +5,15 @@ import { getValue, setValue } from '../key-value-store';
 // Saved once settled: color pickers report every hue on their way
 const saveDelay = 300;
 
+// Updater of the list: merges `changes` into the item `id`
+export const updateItem = (id, changes) => items => items.map(
+  item => (item.id === id ? { ...item, ...changes } : item),
+);
+
 // A list of `{ id, … }` kept in IndexedDB under `storeKey`: tracks and
 // squadrats exports weigh several MB, beyond what localStorage holds.
 // Without IndexedDB (some private modes), the list lasts for the session only.
+// Returns `[items, setItems, isLoaded]`.
 const useStoredList = storeKey => {
   const [items, setItems] = React.useState([]);
   const [isLoaded, setIsLoaded] = React.useState(false);
@@ -49,7 +55,7 @@ const useStoredList = storeKey => {
     [storeKey, items, isLoaded],
   );
 
-  return [items, setItems];
+  return [items, setItems, isLoaded];
 };
 
 export default useStoredList;

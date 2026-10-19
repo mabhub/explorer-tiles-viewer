@@ -9,7 +9,7 @@ import {
   currentYear,
   sharedColors,
 } from '../share-colors';
-import { getSquadratinhos } from '../squadrats';
+import { getLiveTilesUrl, getSquadratinhos, liveTilesMaxZoom } from '../squadrats';
 import { getTrackGeojson } from '../tracks';
 
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
@@ -131,16 +131,39 @@ const MapContent = ({
     </Source>
 
     {/* Over the tiles, under the max areas and the tracks: placed before the
-        max areas, which exist first, whenever they are added */}
-    {squadrats.filter(({ disabled }) => !disabled).map(({ id, color, geojson }) => (
-      <Source key={id} type="geojson" data={getSquadratinhos(geojson)}>
-        <Layer
-          type="fill"
-          beforeId="max-areas"
-          paint={{ 'fill-color': color, 'fill-opacity': 0.35, 'fill-outline-color': color }}
-        />
-      </Source>
-    ))}
+        max areas, which exist first, whenever they are added. A live entry
+        draws the tiles of squadrats.com, its key changes with their timestamp:
+        the source is replaced. */}
+    {squadrats.filter(({ disabled }) => !disabled).map(({
+      id,
+      color,
+      geojson,
+      accountId,
+      live,
+      latest,
+      timestamp,
+    }) => {
+      const paint = { 'fill-color': color, 'fill-opacity': 0.35, 'fill-outline-color': color };
+      if (live && accountId) {
+        const tilesTimestamp = latest ?? timestamp;
+        return (
+          <Source
+            key={`${id}-${tilesTimestamp}`}
+            type="vector"
+            tiles={[getLiveTilesUrl(accountId, tilesTimestamp)]}
+            maxzoom={liveTilesMaxZoom}
+            attribution="© squadrats.com"
+          >
+            <Layer type="fill" source-layer="squadratinhos" beforeId="max-areas" paint={paint} />
+          </Source>
+        );
+      }
+      return (
+        <Source key={id} type="geojson" data={getSquadratinhos(geojson)}>
+          <Layer type="fill" beforeId="max-areas" paint={paint} />
+        </Source>
+      );
+    })}
 
     {tracks.filter(({ disabled }) => !disabled).map(({ id, color, lines }) => (
       <Source key={id} type="geojson" data={getTrackGeojson(lines)}>

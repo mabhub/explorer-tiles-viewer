@@ -34,7 +34,8 @@ import TrackContextMenu from './TrackContextMenu';
 import useActivities, { getPersonByShare } from '../hooks/use-activities';
 import useShareAccounts, { getAccountName } from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
-import useStoredList from '../hooks/use-stored-list';
+import useSquadratsRefresh from '../hooks/use-squadrats-refresh';
+import useStoredList, { updateItem } from '../hooks/use-stored-list';
 import {
   activityColors,
   activityThresholds,
@@ -114,10 +115,12 @@ const layerNameSx = {
 };
 
 // A track or a squadrats export in the panel. The menu opens at (x, y).
+// `status`: 'loading' or 'error' while a squadrats export refreshes
 const LayerRow = ({
   inputId,
   name,
   detail,
+  status,
   color,
   enabled,
   actionsTitle,
@@ -156,6 +159,16 @@ const LayerRow = ({
         {detail}
       </Box>
     )}
+    {status === 'loading' && (
+      <CircularProgress size={12} title="Actualisation…" sx={{ ml: 1, flexShrink: 0 }} />
+    )}
+    {status === 'error' && (
+      <ErrorOutline
+        color="warning"
+        titleAccess="Actualisation impossible : réessayer depuis le menu"
+        sx={{ ml: 1, fontSize: 16 }}
+      />
+    )}
     <IconButton
       size="small"
       title={actionsTitle}
@@ -171,10 +184,7 @@ const LayerRow = ({
   </Stack>
 );
 
-// Updaters of a list of tracks or squadrats exports
-const updateItem = (id, changes) => items => items.map(
-  item => (item.id === id ? { ...item, ...changes } : item),
-);
+// Updater of a list of tracks or squadrats exports: turns the items `ids` on or off
 const toggleItems = (ids, enabled) => items => items.map(
   item => (ids.includes(item.id) ? { ...item, disabled: !enabled } : item),
 );
@@ -201,7 +211,12 @@ const Home = () => {
   const { main: map } = useMap();
   const [shares, setShares] = useShares();
   const [tracks, setTracks] = useStoredList('tracks');
-  const [squadrats, setSquadrats] = useStoredList('squadrats');
+  const [squadrats, setSquadrats, areSquadratsLoaded] = useStoredList('squadrats');
+  const [squadratsStatuses, refreshSquadrats] = useSquadratsRefresh(
+    squadrats,
+    setSquadrats,
+    areSquadratsLoaded,
+  );
   const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
   // Variant of the count coloring mode: activities instead of people
   const [countActivities, setCountActivities] = useLocalStorageState('countActivities', { defaultValue: false });
@@ -343,31 +358,32 @@ const Home = () => {
   const handleTracksToggle = (ids, enabled) => setTracks(toggleItems(ids, enabled));
 
   // An export of an account already listed replaces its data, the entry keeps
-  // its name, color and state
+  // its name, color and state. An account is then brought up to date: the
+  // link may be older than its latest export.
   const handleSquadratsAdd = ({
     accountId,
     name,
     timestamp,
     geojson,
   }) => {
-    setSquadrats(prevSquadrats => {
-      const listed = accountId && prevSquadrats.find(entry => entry.accountId === accountId);
-      if (listed) {
-        return prevSquadrats.map(entry => (entry === listed
-          ? { ...entry, timestamp, geojson }
-          : entry));
-      }
-      return [...prevSquadrats, {
+    const listed = accountId && squadrats.find(entry => entry.accountId === accountId);
+    const added = listed
+      ? { ...listed, timestamp, geojson }
+      : {
         id: crypto.randomUUID(),
         accountId,
         name,
-        color: pickShareColor(getUsedColors(tracks, prevSquadrats)),
+        color: pickShareColor(getUsedColors(tracks, squadrats)),
         disabled: false,
+        live: false,
         timestamp,
         geojson,
-      }];
-    });
+      };
+    setSquadrats(prevSquadrats => (listed
+      ? updateItem(listed.id, { timestamp, geojson })(prevSquadrats)
+      : [...prevSquadrats, added]));
     setIsSquadratsDialogOpen(false);
+    if (accountId) { refreshSquadrats(added); }
   };
 
   const handleSquadratsChange = (id, changes) => setSquadrats(updateItem(id, changes));
@@ -377,15 +393,24 @@ const Home = () => {
     id,
     name,
     disabled,
+    live,
     timestamp,
   }) => ({
     id,
     label: name,
-    detail: timestamp ? formatExportDate(timestamp) : undefined,
+    detail: (live && 'en direct') || (timestamp ? formatExportDate(timestamp) : undefined),
     enabled: !disabled,
   }));
 
   const handleSquadratsToggle = (ids, enabled) => setSquadrats(toggleItems(ids, enabled));
+
+  // Checked again either way: back to a local copy, the export may be older
+  // than the tiles drawn
+  const handleSquadratsLiveToggle = entry => {
+    const live = !entry.live;
+    handleSquadratsChange(entry.id, { live });
+    refreshSquadrats({ ...entry, live });
+  };
 
   const handleSharesToggle = React.useCallback(
     (ids, enabled) => {
@@ -696,6 +721,7 @@ const Home = () => {
                     inputId={`squadrats-${id}`}
                     name={label}
                     detail={detail}
+                    status={squadratsStatuses[id]}
                     color={squadrats[index].color}
                     enabled={!squadrats[index].disabled}
                     actionsTitle="Actions des squadrats"
@@ -792,8 +818,11 @@ const Home = () => {
 
           <SquadratsContextMenu
             position={squadratsMenu}
+            entry={squadrats.find(entry => entry.id === squadratsMenu?.id)}
             onClose={() => setSquadratsMenu()}
             onFit={() => handleSquadratsFit(squadratsMenu.id)}
+            onRefresh={refreshSquadrats}
+            onLiveToggle={handleSquadratsLiveToggle}
             onRename={() => {
               const { id, name } = squadrats.find(entry => entry.id === squadratsMenu.id);
               openRenameDialog('Renommer les squadrats', name, newName => handleSquadratsChange(id, { name: newName }));
