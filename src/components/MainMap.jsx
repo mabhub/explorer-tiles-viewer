@@ -22,12 +22,18 @@ import {
 } from '../max-areas';
 import { defaultBasemap, getBasemap } from '../basemaps';
 import { getTrackTiles } from '../tracks';
+import {
+  applyLayerOrder,
+  findLabelsLayer,
+  getLayerOrder,
+  tilesLayerId,
+} from '../layer-order';
 
 const protocol = new pmtiles.Protocol();
 MapLibreGL.addProtocol('pmtiles', protocol.tile);
 const initialViewState = { longitude: 1.4, latitude: 43.6, zoom: 11 };
 const mapStyle = { width: '100%', minHeight: 100, height: '100%' };
-const interactiveLayerIds = ['tiles'];
+const interactiveLayerIds = [tilesLayerId];
 const noMaxAreas = { square: false, line: false, column: false };
 const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxColumn };
 
@@ -80,8 +86,8 @@ const MainMap = ({
   onSquadratsToggle,
 }) => {
   const mapRef = React.useRef();
-  // Labels of the basemap (vector ones only) to keep above the grid, looked up
-  // each time the grid is added to a new style
+  // Labels of the basemap (vector ones only) to keep above the viewer layers,
+  // looked up each time the grid is added to a new style
   const [labelsLayer, setLabelsLayer] = React.useState();
   const [basemapId, setBasemapId] = useLocalStorageState('basemap', { defaultValue: defaultBasemap.id });
   const basemap = getBasemap(basemapId);
@@ -254,12 +260,42 @@ const MainMap = ({
     [],
   );
 
+  // Viewer layers from bottom to top, kept in that order under the labels
+  const layerOrder = React.useMemo(
+    () => getLayerOrder({
+      squadrats: squadrats.filter(({ disabled }) => !disabled),
+      squadratinhosGrid: showSquadratinhosGrid,
+      activityLines,
+      tracks: tracks.filter(({ disabled }) => !disabled),
+    }),
+    [squadrats, showSquadratinhosGrid, activityLines, tracks],
+  );
+  const layerOrderRef = React.useRef(layerOrder);
+  layerOrderRef.current = layerOrder;
+  const labelsLayerRef = React.useRef(labelsLayer);
+  labelsLayerRef.current = labelsLayer;
+
+  // Layers are created in order, but a list reordered does not move them, and
+  // one created later (an entry turned on, a source replaced) goes on top
+  React.useEffect(
+    () => {
+      if (mapRef.current) { applyLayerOrder(mapRef.current.getMap(), layerOrder, labelsLayer); }
+    },
+    [layerOrder, labelsLayer],
+  );
+  // Reported the frame after any change of the style, layers added included
+  const handleStyleData = React.useCallback(
+    ({ target: map }) => applyLayerOrder(map, layerOrderRef.current, labelsLayerRef.current),
+    [],
+  );
+
   const handleSourceData = React.useCallback(
     ({ sourceId, sourceDataType, target: map }) => {
       // A replaced style also reports metadata for its removed grid source
       if (sourceId !== gridFeature.source || sourceDataType !== 'metadata'
         || !map.getSource(gridFeature.source)) { return; }
-      setLabelsLayer(map.getLayer('waterway-name') ? 'waterway-name' : undefined);
+      // The viewer layers may already be there: left out of the search
+      setLabelsLayer(findLabelsLayer(map.getStyle().layers, new Set(layerOrderRef.current)));
       setGridVersion(version => version + 1);
     },
     [],
@@ -322,6 +358,7 @@ const MainMap = ({
       mapStyle={basemap.style}
       onLoad={handleMapLoad}
       onSourceData={handleSourceData}
+      onStyleData={handleStyleData}
       onContextMenu={handleContextMenu}
       ref={mapRef}
       interactiveLayerIds={interactiveLayerIds}
@@ -330,7 +367,7 @@ const MainMap = ({
     >
       <Cadastre show={cadastre} />
       <MapContent
-        gridBefore={labelsLayer}
+        labelsLayer={labelsLayer}
         tracks={tracks}
         squadrats={squadrats}
         activityLines={activityLines}

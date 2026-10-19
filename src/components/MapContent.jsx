@@ -12,6 +12,14 @@ import {
 } from '../share-colors';
 import { getLiveTilesUrl, getSquadratinhos, liveTilesMaxZoom } from '../squadrats';
 import { getTrackGeojson } from '../tracks';
+import {
+  getActivityLinesLayerId,
+  getLiveTimestamp,
+  getSquadratsLayerId,
+  getTrackLayerId,
+  maxAreasLayerId,
+  tilesLayerId,
+} from '../layer-order';
 import SquadratinhosGrid from './SquadratinhosGrid';
 
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
@@ -105,8 +113,11 @@ const getFillColor = (colorMode, countActivities, activePersonCount) => {
   return countActivities ? activityColor : countColor;
 };
 
+// Layers are rendered from bottom to top, all under the labels of the basemap:
+// a fresh style gets them in order (see `getLayerOrder`, which MainMap applies
+// to the layers added or moved later)
 const MapContent = ({
-  gridBefore,
+  labelsLayer,
   colorMode,
   countActivities,
   activePersonCount,
@@ -125,7 +136,7 @@ const MapContent = ({
       promoteId="id"
     >
       <Layer
-        id="tiles"
+        id={tilesLayerId}
         type="fill"
         source-layer={gridFeature.sourceLayer}
         paint={{
@@ -137,77 +148,72 @@ const MapContent = ({
             0.5,
           ],
         }}
-        key={`${gridBefore}fill`}
-        beforeId={gridBefore}
+        beforeId={labelsLayer}
       />
     </Source>
 
-    <Source id="max-areas" type="geojson" data={maxAreas}>
-      <Layer
-        id="max-areas"
-        type="line"
-        paint={{ 'line-color': ['get', 'color'], 'line-width': 3 }}
-      />
-    </Source>
-
-    {/* Over the tiles, under the max areas and the tracks: placed before the
-        max areas, which exist first, whenever they are added. A live entry
-        draws the tiles of squadrats.com, its key changes with their timestamp:
-        the source is replaced. */}
-    {squadrats.filter(({ disabled }) => !disabled).map(({
-      id,
-      color,
-      geojson,
-      accountId,
-      live,
-      latest,
-      timestamp,
-    }) => {
+    {/* A live entry draws the tiles of squadrats.com, its id changes with
+        their timestamp: the source is replaced */}
+    {squadrats.filter(({ disabled }) => !disabled).reverse().map(entry => {
+      const { color, geojson, accountId } = entry;
+      const id = getSquadratsLayerId(entry);
+      const liveTimestamp = getLiveTimestamp(entry);
       const paint = { 'fill-color': color, 'fill-opacity': 0.35, 'fill-outline-color': color };
-      if (live && accountId) {
-        const tilesTimestamp = latest ?? timestamp;
+      if (liveTimestamp) {
         return (
           <Source
-            key={`${id}-${tilesTimestamp}`}
+            key={id}
+            id={id}
             type="vector"
-            tiles={[getLiveTilesUrl(accountId, tilesTimestamp)]}
+            tiles={[getLiveTilesUrl(accountId, liveTimestamp)]}
             maxzoom={liveTilesMaxZoom}
             attribution="© squadrats.com"
           >
-            <Layer type="fill" source-layer="squadratinhos" beforeId="max-areas" paint={paint} />
+            <Layer id={id} type="fill" source-layer="squadratinhos" beforeId={labelsLayer} paint={paint} />
           </Source>
         );
       }
       return (
-        <Source key={id} type="geojson" data={getSquadratinhos(geojson)}>
-          <Layer type="fill" beforeId="max-areas" paint={paint} />
+        <Source key={id} id={id} type="geojson" data={getSquadratinhos(geojson)}>
+          <Layer id={id} type="fill" beforeId={labelsLayer} paint={paint} />
         </Source>
       );
     })}
 
-    {showSquadratinhosGrid && <SquadratinhosGrid />}
+    {showSquadratinhosGrid && <SquadratinhosGrid beforeId={labelsLayer} />}
 
-    {/* Over the tiles, under the labels of the basemap, as the tiles, and
-        always under the max areas. Fixed ids: a layer created twice (strict
-        mode) is not drawn twice. */}
-    {activityLines.map(({ id, color, geojson }) => (
-      <Source key={id} id={`activity-lines-${id}`} type="geojson" data={geojson}>
-        <Layer
-          key={`${gridBefore}lines`}
-          id={`activity-lines-${id}`}
-          type="line"
-          beforeId={gridBefore ?? 'max-areas'}
-          layout={activityLinesLayout}
-          paint={{ 'line-color': color, 'line-width': 1.5, 'line-opacity': 0.7 }}
-        />
-      </Source>
-    ))}
+    {activityLines.slice().reverse().map(({ id: shareId, color, geojson }) => {
+      const id = getActivityLinesLayerId(shareId);
+      return (
+        <Source key={id} id={id} type="geojson" data={geojson}>
+          <Layer
+            id={id}
+            type="line"
+            beforeId={labelsLayer}
+            layout={activityLinesLayout}
+            paint={{ 'line-color': color, 'line-width': 1.5, 'line-opacity': 0.7 }}
+          />
+        </Source>
+      );
+    })}
 
-    {tracks.filter(({ disabled }) => !disabled).map(({ id, color, lines }) => (
-      <Source key={id} type="geojson" data={getTrackGeojson(lines)}>
-        <Layer type="line" paint={{ 'line-color': color, 'line-width': 3 }} />
-      </Source>
-    ))}
+    {tracks.filter(({ disabled }) => !disabled).reverse().map(({ id: trackId, color, lines }) => {
+      const id = getTrackLayerId(trackId);
+      return (
+        <Source key={id} id={id} type="geojson" data={getTrackGeojson(lines)}>
+          <Layer id={id} type="line" beforeId={labelsLayer} paint={{ 'line-color': color, 'line-width': 3 }} />
+        </Source>
+      );
+    })}
+
+    <Source id={maxAreasLayerId} type="geojson" data={maxAreas}>
+      <Layer
+        id={maxAreasLayerId}
+        type="line"
+        beforeId={labelsLayer}
+        paint={{ 'line-color': ['get', 'color'], 'line-width': 3 }}
+      />
+    </Source>
   </>
 );
 

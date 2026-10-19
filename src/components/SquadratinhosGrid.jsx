@@ -7,6 +7,7 @@ import {
   tile2lat,
   tile2long,
 } from '../lib';
+import { squadratinhosGridLayerId } from '../layer-order';
 
 const zoom = 17;
 const tileCount = 2 ** zoom;
@@ -73,7 +74,7 @@ const paint = {
 };
 
 // Grid of the squadratinhos (z17 tiles), from zoom 13, over the visible area
-const SquadratinhosGrid = () => {
+const SquadratinhosGrid = ({ beforeId }) => {
   const { current: map } = useMap();
   const [area, setArea] = React.useState();
 
@@ -95,12 +96,12 @@ const SquadratinhosGrid = () => {
   const data = React.useMemo(() => (area ? getGridLines(area) : emptyGrid), [area]);
 
   return (
-    <Source id="squadratinhos-grid" type="geojson" data={data}>
+    <Source id={squadratinhosGridLayerId} type="geojson" data={data}>
       <Layer
-        id="squadratinhos-grid"
+        id={squadratinhosGridLayerId}
         type="line"
         minzoom={squadratinhosGridMinZoom}
-        beforeId="max-areas"
+        beforeId={beforeId}
         paint={paint}
       />
     </Source>
