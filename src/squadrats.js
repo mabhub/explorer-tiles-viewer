@@ -59,7 +59,10 @@ export const parseExport = text => {
 
 export const fetchExport = async (accountId, timestamp) => {
   const response = await fetchWithin(getExportUrl(accountId, timestamp), downloadTimeout);
-  if (!response.ok) { throw new Error(`Export unavailable (${response.status})`); }
+  // `status` 404: squadrats.com did not make the export of that timestamp
+  if (!response.ok) {
+    throw Object.assign(new Error(`Export unavailable (${response.status})`), { status: response.status });
+  }
   return parseExport(await response.text());
 };
 

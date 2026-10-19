@@ -116,8 +116,14 @@ const layerNameSx = {
   whiteSpace: 'nowrap',
 };
 
+// Status of a squadrats export once its refresh failed
+const statusTitles = {
+  error:    'Actualisation impossible : réessayer depuis le menu',
+  outdated: 'Données plus récentes sur squadrats.com, sans export : réexporter puis actualiser, ou lire en direct',
+};
+
 // A track or a squadrats export in the panel. The menu opens at (x, y).
-// `status`: 'loading' or 'error' while a squadrats export refreshes
+// `status`: 'loading', 'error' or 'outdated' while a squadrats export refreshes
 const LayerRow = ({
   inputId,
   name,
@@ -164,10 +170,10 @@ const LayerRow = ({
     {status === 'loading' && (
       <CircularProgress size={12} title="Actualisation…" sx={{ ml: 1, flexShrink: 0 }} />
     )}
-    {status === 'error' && (
+    {statusTitles[status] && (
       <ErrorOutline
         color="warning"
-        titleAccess="Actualisation impossible : réessayer depuis le menu"
+        titleAccess={statusTitles[status]}
         sx={{ ml: 1, fontSize: 16 }}
       />
     )}

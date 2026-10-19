@@ -19,7 +19,9 @@ const withStatus = (id, status) => ({ [id]: previous, ...others }) => (
 // the new export, a live entry only draws the tiles of that timestamp. Both
 // get the list of the squadrats of that timestamp, to compare with
 // Statshunters, and the public name of the account, to find its person.
-// Returns `[statuses, refresh]`, statuses being `{ [id]: 'loading' | 'error' }`.
+// Returns `[statuses, refresh]`, statuses being `{ [id]: 'loading' | 'error' }`,
+// or 'outdated' when the export of the latest computation is missing (the
+// local copy stays as it was).
 const useSquadratsRefresh = (squadrats, setSquadrats, isLoaded) => {
   const [statuses, setStatuses] = React.useState({});
 
@@ -71,7 +73,7 @@ const useSquadratsRefresh = (squadrats, setSquadrats, isLoaded) => {
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error(error);
-        setStatuses(withStatus(id, 'error'));
+        setStatuses(withStatus(id, error.status === 404 ? 'outdated' : 'error'));
       }
     },
     [setSquadrats],
