@@ -26,6 +26,8 @@ const unvisitedColor = ['case', hasTrack, ['to-color', ['feature-state', 'track'
 
 const outlineColor = '#00000044';
 
+const activityLinesLayout = { 'line-join': 'round', 'line-cap': 'round' };
+
 // Compare mode: only the tiles of the compared person and of their squadrats
 const compareKind = ['coalesce', ['feature-state', 'compare'], ''];
 const compareColor = [
@@ -113,6 +115,7 @@ const MapContent = ({
   showSquadratinhosGrid,
   tracks = [],
   squadrats = [],
+  activityLines = [],
 }) => (
   <>
     <Source
@@ -183,6 +186,22 @@ const MapContent = ({
     })}
 
     {showSquadratinhosGrid && <SquadratinhosGrid />}
+
+    {/* Over the tiles, under the labels of the basemap, as the tiles, and
+        always under the max areas. Fixed ids: a layer created twice (strict
+        mode) is not drawn twice. */}
+    {activityLines.map(({ id, color, geojson }) => (
+      <Source key={id} id={`activity-lines-${id}`} type="geojson" data={geojson}>
+        <Layer
+          key={`${gridBefore}lines`}
+          id={`activity-lines-${id}`}
+          type="line"
+          beforeId={gridBefore ?? 'max-areas'}
+          layout={activityLinesLayout}
+          paint={{ 'line-color': color, 'line-width': 1.5, 'line-opacity': 0.7 }}
+        />
+      </Source>
+    ))}
 
     {tracks.filter(({ disabled }) => !disabled).map(({ id, color, lines }) => (
       <Source key={id} type="geojson" data={getTrackGeojson(lines)}>

@@ -3,6 +3,7 @@ import {
   Divider,
   ListItemIcon,
   ListItemText,
+  ListSubheader,
   Menu,
   MenuItem,
 } from '@mui/material';
@@ -33,6 +34,9 @@ const submenuOrigins = {
   anchorOrigin: { vertical: 'top', horizontal: 'right' },
   transformOrigin: { vertical: 'top', horizontal: 'left' },
 };
+
+// Names the group of the activity lines, whose labels are the account ones
+const subheaderSx = { lineHeight: '32px', bgcolor: 'transparent' };
 
 const CheckItem = ({
   checked,
@@ -81,6 +85,8 @@ const MapContextMenu = ({
   onTrackAdd,
   shareItems,
   onSharesToggle,
+  activityItems = [],
+  onActivitiesToggle,
   trackItems,
   onTracksToggle,
   onSquadratsAdd,
@@ -272,6 +278,14 @@ const MapContextMenu = ({
         {shareItems.length > 0 && <Divider />}
         {shareItems.map(item => (
           <LayerItem key={item.id} {...item} onToggle={onSharesToggle} />
+        ))}
+        {/* Not part of « Tout activer »: each account loads up to a few MB */}
+        {activityItems.length > 0 && <Divider />}
+        {activityItems.length > 0 && (
+          <ListSubheader sx={subheaderSx}>Activités</ListSubheader>
+        )}
+        {activityItems.map(item => (
+          <LayerItem key={item.id} {...item} onToggle={onActivitiesToggle} />
         ))}
         {trackItems.length > 0 && <Divider />}
         {trackItems.map(item => (

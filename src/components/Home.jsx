@@ -19,6 +19,7 @@ import {
   ErrorOutline,
   MoreVert,
   People,
+  Timeline,
 } from '@mui/icons-material';
 import { useMap } from 'react-map-gl/maplibre';
 import useLocalStorageState from 'use-local-storage-state';
@@ -32,6 +33,7 @@ import SquadratsContextMenu from './SquadratsContextMenu';
 import SquadratsDialog from './SquadratsDialog';
 import TrackContextMenu from './TrackContextMenu';
 import useActivities, { getPersonByShare } from '../hooks/use-activities';
+import useActivityLines, { linesEndpoint } from '../hooks/use-activity-lines';
 import useShareAccounts, { getAccountName } from '../hooks/use-share-accounts';
 import useShares, { isShareActive } from '../hooks/use-shares';
 import useSquadratsRefresh from '../hooks/use-squadrats-refresh';
@@ -51,6 +53,7 @@ import {
 import { formatExportDate, getSquadratinhosRings } from '../squadrats';
 import { compareTiles, getComparedEntry, getComparedPerson } from '../squadrats-compare';
 import { getTrackBounds, parseTrack } from '../tracks';
+import { getLinesGeojson } from '../activity-lines';
 
 const globalStyles = { 'html, body, #root': { height: '100%' } };
 const wrapperSx = { height: '100%' };
@@ -192,6 +195,45 @@ const LayerRow = ({
   </Stack>
 );
 
+// Shows or hides the activity lines of an account, in the person color, grayed
+// while the account is disabled. `query`: their loading, once asked for.
+const LinesButton = ({
+  name,
+  shown,
+  active,
+  color,
+  query,
+  onToggle,
+}) => {
+  if (query?.isError && !query.isFetching) {
+    return (
+      <IconButton
+        size="small"
+        color="warning"
+        title="Échec du chargement des activités, réessayer"
+        aria-label={`Recharger les activités de ${name}`}
+        onClick={() => query.refetch()}
+      >
+        <ErrorOutline sx={{ fontSize: 16 }} />
+      </IconButton>
+    );
+  }
+  return (
+    <IconButton
+      size="small"
+      title={shown ? 'Masquer les activités' : 'Afficher les activités'}
+      aria-label={`Activités de ${name}`}
+      aria-pressed={shown}
+      onClick={onToggle}
+      sx={{ ml: 0.5, color: shown && active ? color : 'text.disabled' }}
+    >
+      {query?.isFetching
+        ? <CircularProgress size={14} color="inherit" />
+        : <Timeline sx={{ fontSize: 16 }} />}
+    </IconButton>
+  );
+};
+
 // Updater of a list of tracks or squadrats exports: turns the items `ids` on or off
 const toggleItems = (ids, enabled) => items => items.map(
   item => (ids.includes(item.id) ? { ...item, disabled: !enabled } : item),
@@ -328,6 +370,24 @@ const Home = () => {
     shareIdList.map((id, index) => [id, shareAccounts[index]?.data]),
   );
   const getShareLabel = id => shares[id]?.alias || getAccountName(accountByShare[id]) || id;
+
+  // Activity lines: offered only when the share link allows them (C1),
+  // loaded only once shown, drawn only for active shares
+  const canShowLines = id => Boolean(linesEndpoint && accountByShare[id]?.lines);
+  const linesShareIds = shareIdList.filter(
+    id => shares[id].showLines && isShareActive(shares[id]) && canShowLines(id),
+  );
+  const linesQueries = useActivityLines(linesShareIds.join(','));
+  const linesQueryByShare = Object.fromEntries(
+    linesShareIds.map((id, index) => [id, linesQueries[index]]),
+  );
+  // Kept apart from the colors: recoloring does not send the lines to the map again
+  const linesGeojsonByShare = React.useMemo(
+    () => Object.fromEntries(linesQueries
+      .filter(({ data }) => data)
+      .map(({ data: [id, lines] }) => [id, getLinesGeojson(lines)])),
+    [linesQueries],
+  );
   const labelByShare = Object.fromEntries(
     shareIdList.map(id => [id, getShareLabel(firstShareByShare[id])]),
   );
@@ -488,6 +548,16 @@ const Home = () => {
     [setShares],
   );
 
+  const handleLinesToggle = (ids, shown) => {
+    setShares(prevShares => ({
+      ...prevShares,
+      ...Object.fromEntries(ids.map(id => [
+        id,
+        { ...prevShares[id], showLines: shown || undefined },
+      ])),
+    }));
+  };
+
   const handleShareClick = React.useCallback(
     ({ target: { id } = {} }, checked) => handleSharesToggle([id], checked),
     [handleSharesToggle],
@@ -503,6 +573,21 @@ const Home = () => {
       enabled: isShareActive(shares[id]),
     };
   });
+
+  // Accounts whose link allows the lines, for the layers submenu
+  const activityItems = shareItems
+    .filter(({ id }) => canShowLines(id))
+    .map(item => ({ ...item, enabled: Boolean(shares[item.id].showLines) }));
+
+  // Same array between renders: the map content is memoized
+  const activityLines = React.useMemo(
+    () => Object.entries(linesGeojsonByShare).map(([id, geojson]) => ({
+      id,
+      geojson,
+      color: colorByShare[id],
+    })),
+    [linesGeojsonByShare, colorByShare],
+  );
 
   const openShareDialog = share => {
     setDialogShare(share);
@@ -589,6 +674,7 @@ const Home = () => {
         <MainMap
           tracks={tracks}
           squadrats={squadrats}
+          activityLines={activityLines}
           colorMode={colorMode}
           compareKindByTile={comparison?.kindByTile ?? noTiles}
           countActivities={countActivities}
@@ -601,6 +687,8 @@ const Home = () => {
           onShareAdd={() => openShareDialog()}
           shareItems={shareItems}
           onSharesToggle={handleSharesToggle}
+          activityItems={activityItems}
+          onActivitiesToggle={handleLinesToggle}
           onTrackAdd={() => trackInputRef.current.click()}
           trackItems={trackItems}
           onTracksToggle={handleTracksToggle}
@@ -722,6 +810,16 @@ const Home = () => {
                       hideId={hideShareIds}
                     />
                   </Box>
+                  {canShowLines(id) && (
+                    <LinesButton
+                      name={getShareLabel(id)}
+                      shown={Boolean(shares[id].showLines)}
+                      active={isShareActive(shares[id])}
+                      color={colorByShare[id]}
+                      query={linesQueryByShare[id]}
+                      onToggle={() => handleLinesToggle([id], !shares[id].showLines)}
+                    />
+                  )}
                   <IconButton
                     size="small"
                     title="Actions du compte"
@@ -889,6 +987,13 @@ const Home = () => {
             onHideShareIdsToggle={() => setHideShareIds(previous => !previous)}
             canResetColors={colorMode === 'owner'}
             onColorsReset={handleColorsReset}
+            offersLines={Boolean(linesEndpoint)}
+            canShowLines={Boolean(shareMenu) && canShowLines(shareMenu.id)}
+            linesShown={Boolean(shareMenu && shares[shareMenu.id]?.showLines)}
+            onLinesToggle={() => handleLinesToggle(
+              [shareMenu.id],
+              !shares[shareMenu.id]?.showLines,
+            )}
           />
 
           <TrackContextMenu

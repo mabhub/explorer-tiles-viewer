@@ -27,6 +27,10 @@ const ShareContextMenu = ({
   onHideShareIdsToggle,
   canResetColors,
   onColorsReset,
+  offersLines,
+  canShowLines,
+  linesShown,
+  onLinesToggle,
 }) => {
   const menuProps = usePassThroughMenu({ open: Boolean(position), onClose, name: 'share' });
 
@@ -68,6 +72,21 @@ const ShareContextMenu = ({
       </MenuItem>
       <Divider />
       {/* Left open, as the toggles of the map context menu */}
+      {offersLines && (
+        <MenuItem
+          role="menuitemcheckbox"
+          aria-checked={linesShown}
+          disabled={!canShowLines}
+          onClick={onLinesToggle}
+        >
+          <ListItemIcon>
+            {linesShown ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}
+          </ListItemIcon>
+          <ListItemText secondary={canShowLines ? undefined : 'Non autorisées par le lien'}>
+            Afficher les activités
+          </ListItemText>
+        </MenuItem>
+      )}
       <MenuItem role="menuitemcheckbox" aria-checked={hideShareIds} onClick={onHideShareIdsToggle}>
         <ListItemIcon>
           {hideShareIds ? <CheckBox fontSize="small" /> : <CheckBoxOutlineBlank fontSize="small" />}

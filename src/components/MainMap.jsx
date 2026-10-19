@@ -57,6 +57,7 @@ const useGridState = (mapRef, gridVersion, valueById, name) => {
 const MainMap = ({
   tracks,
   squadrats,
+  activityLines,
   colorMode,
   compareKindByTile,
   countActivities,
@@ -70,6 +71,8 @@ const MainMap = ({
   onTrackAdd,
   shareItems,
   onSharesToggle,
+  activityItems,
+  onActivitiesToggle,
   trackItems,
   onTracksToggle,
   onSquadratsAdd,
@@ -330,6 +333,7 @@ const MainMap = ({
         gridBefore={labelsLayer}
         tracks={tracks}
         squadrats={squadrats}
+        activityLines={activityLines}
         colorMode={colorMode}
         countActivities={countActivities}
         activePersonCount={activePersonCount}
@@ -378,6 +382,8 @@ const MainMap = ({
         onTrackAdd={onTrackAdd}
         shareItems={shareItems}
         onSharesToggle={onSharesToggle}
+        activityItems={activityItems}
+        onActivitiesToggle={onActivitiesToggle}
         trackItems={trackItems}
         onTracksToggle={onTracksToggle}
         onSquadratsAdd={onSquadratsAdd}
