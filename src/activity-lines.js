@@ -35,8 +35,14 @@ export const decodePolyline = encoded => {
   return points;
 };
 
-// One feature for all the lines of a share
+// One feature per activity, identified by its Statshunters id: a click on a
+// line finds its activity, and the line is highlighted through feature-state
 export const getLinesGeojson = lines => ({
-  type:     'Feature',
-  geometry: { type: 'MultiLineString', coordinates: lines },
+  type:     'FeatureCollection',
+  features: lines.map(({ id, points }) => ({
+    type:       'Feature',
+    id,
+    geometry:   { type: 'LineString', coordinates: points },
+    properties: {},
+  })),
 });

@@ -35,6 +35,17 @@ const unvisitedColor = ['case', hasTrack, ['to-color', ['feature-state', 'track'
 const outlineColor = '#00000044';
 
 const activityLinesLayout = { 'line-join': 'round', 'line-cap': 'round' };
+const noHighlight = [];
+// Lines of the activities shown in the popup stand out. Named in the style,
+// not in a feature-state: a source created again (style or data) keeps them.
+const getActivityLinesPaint = (color, highlightedIds) => {
+  const isHighlighted = ['in', ['id'], ['literal', highlightedIds]];
+  return {
+    'line-color':   color,
+    'line-width':   ['case', isHighlighted, 4, 1.5],
+    'line-opacity': ['case', isHighlighted, 1, 0.7],
+  };
+};
 
 // Compare mode: only the tiles of the compared person and of their squadrats
 const compareKind = ['coalesce', ['feature-state', 'compare'], ''];
@@ -127,6 +138,7 @@ const MapContent = ({
   tracks = [],
   squadrats = [],
   activityLines = [],
+  highlightedLines = {},
 }) => (
   <>
     <Source
@@ -191,7 +203,7 @@ const MapContent = ({
             type="line"
             beforeId={labelsLayer}
             layout={activityLinesLayout}
-            paint={{ 'line-color': color, 'line-width': 1.5, 'line-opacity': 0.7 }}
+            paint={getActivityLinesPaint(color, highlightedLines[shareId] ?? noHighlight)}
           />
         </Source>
       );

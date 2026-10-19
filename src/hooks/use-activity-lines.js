@@ -3,7 +3,8 @@ import useSharePages from './use-share-pages';
 
 export const linesEndpoint = import.meta.env.VITE_LINES_ENDPOINT;
 
-// Pages are kept encoded in the cache, decoded once per page fetched.
+// Pages are kept encoded in the cache, decoded once per page fetched, each
+// line with the Statshunters id of its activity (`ids`, same order).
 // Lines of a single point are not drawn.
 const options = {
   kind:     'lines',
@@ -11,11 +12,13 @@ const options = {
   getItems: data => data.lines,
   select:   data => ({
     ...data,
-    lines: data.lines.map(decodePolyline).filter(points => points.length > 1),
+    lines: data.lines
+      .map((line, index) => ({ id: data.ids?.[index], points: decodePolyline(line) }))
+      .filter(({ points }) => points.length > 1),
   }),
 };
 
-// One result per share: { data: [shareId, lines], isComplete, … }, see
+// One result per share: { data: [shareId, [{ id, points }]], isComplete, … }, see
 // use-share-pages. Only for the shares whose link allows the lines: the
 // endpoint refuses the others (403).
 const useActivityLines = shareIdsString => useSharePages(shareIdsString, options);

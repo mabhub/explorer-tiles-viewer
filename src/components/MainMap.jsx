@@ -25,6 +25,7 @@ import { getTrackTiles } from '../tracks';
 import {
   applyLayerOrder,
   findLabelsLayer,
+  getActivityLinesLayerId,
   getLayerOrder,
   tilesLayerId,
 } from '../layer-order';
@@ -34,6 +35,9 @@ MapLibreGL.addProtocol('pmtiles', protocol.tile);
 const initialViewState = { longitude: 1.4, latitude: 43.6, zoom: 11 };
 const mapStyle = { width: '100%', minHeight: 100, height: '100%' };
 const interactiveLayerIds = [tilesLayerId];
+// Half side, in pixels, of the square searched for activity lines around a
+// click: they are thin
+const lineClickTolerance = 5;
 const noMaxAreas = { square: false, line: false, column: false };
 const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxColumn };
 
@@ -95,6 +99,8 @@ const MainMap = ({
   const [showGrid, setShowGrid] = useLocalStorageState('showGrid', { defaultValue: true });
   const [showSquadratinhosGrid, setShowSquadratinhosGrid] = useLocalStorageState('squadratinhosGrid', { defaultValue: false });
   const [activeTile, setActiveTile] = React.useState();
+  // Activity lines under the last click: { longitude, latitude, lines: [{ shareId, id }] }
+  const [activeLines, setActiveLines] = React.useState();
   const [cadastre] = React.useState(false);
   const [shares] = useShares();
 
@@ -147,6 +153,39 @@ const MainMap = ({
       return store;
     },
     [allActivitiesQueries, shares],
+  );
+
+  // Activities of the shares whose lines are drawn, by Statshunters id: each
+  // line names its activity
+  const activityByShare = React.useMemo(
+    () => {
+      const lineShareIds = new Set(activityLines.map(({ id }) => id));
+      return Object.fromEntries(allActivitiesQueries
+        .filter(({ data: [id, activities] = [] }) => activities && lineShareIds.has(id))
+        .map(({ data: [id, activities] }) => [
+          id,
+          Object.fromEntries(activities.map(activity => [activity.id, activity])),
+        ]));
+    },
+    [allActivitiesQueries, activityLines],
+  );
+
+  // Clicked lines as the activities of a tile, for the same popup
+  const activeLineActivities = React.useMemo(
+    () => (activeLines?.lines ?? [])
+      .map(({ shareId, id }) => ({ activity: activityByShare[shareId]?.[id], shareId }))
+      .filter(({ activity }) => activity),
+    [activeLines, activityByShare],
+  );
+  const highlightedLines = React.useMemo(
+    () => {
+      const ids = {};
+      activeLineActivities.forEach(({ shareId, activity }) => {
+        ids[shareId] = [...ids[shareId] ?? [], activity.id];
+      });
+      return ids;
+    },
+    [activeLineActivities],
   );
 
   // Max square, line and column of each person (all their active shares
@@ -319,7 +358,39 @@ const MainMap = ({
   );
 
   const handleMapClick = React.useCallback(
-    ({ features: [feature], target: map }) => {
+    ({
+      point,
+      lngLat,
+      features: [feature],
+      target: map,
+    }) => {
+      // Activity lines win over the tile underneath: near a line, its activities
+      const shareByLayer = Object.fromEntries(activityLines
+        .map(({ id }) => [getActivityLinesLayerId(id), id]));
+      const layers = Object.keys(shareByLayer).filter(id => map.getLayer(id));
+      const box = [
+        [point.x - lineClickTolerance, point.y - lineClickTolerance],
+        [point.x + lineClickTolerance, point.y + lineClickTolerance],
+      ];
+      // A line split over several map tiles is found once per tile. A plain
+      // object: Map is the map component in this module.
+      const lines = Object.values(Object.fromEntries(
+        (layers.length ? map.queryRenderedFeatures(box, { layers }) : [])
+          .map(({ layer, id }) => ({ shareId: shareByLayer[layer.id], id }))
+          .filter(({ shareId, id }) => activityByShare[shareId]?.[id])
+          .map(line => [`${line.shareId}/${line.id}`, line]),
+      ));
+
+      if (lines.length) {
+        if (activeTile) {
+          map.setFeatureState(activeTile, { clicked: false });
+          setActiveTile(null);
+        }
+        setActiveLines({ longitude: lngLat.lng, latitude: lngLat.lat, lines });
+        return;
+      }
+      setActiveLines();
+
       // The open tile again, an unvisited tile or no tile at all: close the popup
       if (feature?.id === activeTile?.id || !feature?.state.count) {
         if (activeTile) {
@@ -333,7 +404,7 @@ const MainMap = ({
       map.setFeatureState(feature, { clicked: true });
       setActiveTile(feature);
     },
-    [activeTile],
+    [activeTile, activityLines, activityByShare],
   );
 
   const activeTileData = activeTile && allTiles[activeTile.id];
@@ -347,6 +418,14 @@ const MainMap = ({
       }
     },
     [activeTile, activeTileData],
+  );
+
+  // Close the popup once none of its activities is drawn any more
+  React.useEffect(
+    () => {
+      if (activeLines && !activeLineActivities.length) { setActiveLines(); }
+    },
+    [activeLines, activeLineActivities],
   );
 
   return (
@@ -371,6 +450,7 @@ const MainMap = ({
         tracks={tracks}
         squadrats={squadrats}
         activityLines={activityLines}
+        highlightedLines={highlightedLines}
         colorMode={colorMode}
         countActivities={countActivities}
         activePersonCount={activePersonCount}
@@ -393,6 +473,22 @@ const MainMap = ({
           <TilePopup
             key={activeTile.id}
             tile={activeTileData}
+            labelByShare={labelByShare}
+            colorByShare={colorByShare}
+          />
+        </Popup>
+      )}
+      {activeLineActivities.length > 0 && (
+        <Popup
+          latitude={activeLines.latitude}
+          longitude={activeLines.longitude}
+          onClose={() => setActiveLines()}
+          closeOnClick={false}
+          maxWidth="360px"
+        >
+          <TilePopup
+            key={`${activeLines.longitude},${activeLines.latitude}`}
+            tile={{ activities: activeLineActivities }}
             labelByShare={labelByShare}
             colorByShare={colorByShare}
           />
