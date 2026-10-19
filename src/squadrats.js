@@ -10,6 +10,10 @@ const getExportUrl = (accountId, timestamp) => `https://squadrats.org/trophies/$
 const getAccountUrl = accountId => `https://mainframe-api.squadrats.com/anonymous/squadrants/${accountId}/trophies`;
 const getTimestampsUrl = accountId => `https://tiles-beta.squadrats.com/${accountId}/trophies/timestamps`;
 
+// Servers of the browser extension of squadrats.com, also anonymous and open
+// to any origin: they list the tiles of the trophies
+const extensionServers = ['https://mainframe-proxy-01.squadrats.com', 'https://mainframe-proxy-02.squadrats.com'];
+
 export const getLiveTilesUrl = (accountId, timestamp) => `https://tiles-beta.squadrats.com/${accountId}/trophies-earth/${timestamp}/{z}/{x}/{y}.pbf`;
 // Deeper zooms show the tiles of this one
 export const liveTilesMaxZoom = 12;
@@ -60,6 +64,22 @@ export const fetchLatestTimestamp = async accountId => {
   return earth;
 };
 
+const fetchSquadratTilesFrom = async (server, accountId) => {
+  const response = await fetch(`${server}/anonymous/squadrants/${accountId}`);
+  if (!response.ok) { throw new Error(`Squadrats unavailable (${response.status})`); }
+  const { raw } = await response.json();
+  if (!Array.isArray(raw?.[14])) { throw new Error('No squadrats in the response'); }
+  return raw[14];
+};
+
+// Squadrats (zoom 14 tiles) of the account, as "x-y": from a server picked at
+// random, the other one if it fails
+export const fetchSquadratTiles = accountId => {
+  const first = Math.floor(Math.random() * extensionServers.length);
+  return fetchSquadratTilesFrom(extensionServers[first], accountId)
+    .catch(() => fetchSquadratTilesFrom(extensionServers[1 - first], accountId));
+};
+
 // Public first and last name of the account
 export const fetchAccountName = async accountId => {
   const response = await fetch(getAccountUrl(accountId));
@@ -82,4 +102,17 @@ export const getSquadratinhos = geojson => geojson.features.find(isSquadratinhos
 export const getSquadratinhosRings = geojson => {
   const { geometry: { type, coordinates } } = getSquadratinhos(geojson);
   return type === 'Polygon' ? coordinates : coordinates.flat();
+};
+
+const squadratKeysCache = new WeakMap();
+
+// Keys ("14/x/y") of the grid tiles of the squadrats
+export const getSquadratKeys = squadratTiles => {
+  if (!squadratKeysCache.has(squadratTiles)) {
+    squadratKeysCache.set(
+      squadratTiles,
+      new Set(squadratTiles.map(tile => `14/${tile.replace('-', '/')}`)),
+    );
+  }
+  return squadratKeysCache.get(squadratTiles);
 };

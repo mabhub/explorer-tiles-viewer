@@ -11,6 +11,10 @@ export const activityColors = ['#fed976', '#feb24c', '#fd8d3c', '#fc4e2a', '#e31
 export const currentYear = new Date().getFullYear();
 export const ageColors = ['#0d47a1', '#1565c0', '#1e88e5', '#64b5f6', '#90a4ae', '#9e9e9e'];
 
+// Compare coloring mode: tiles of a person known to both Statshunters and
+// squadrats.com, or to only one of them
+export const compareColors = { both: '#9e9e9e', statshunters: '#1e88e5', squadrats: '#fb8c00' };
+
 // Per-person colors for the owner coloring mode. Reds and oranges are left
 // out: the count coloring mode uses them.
 export const shareColors = [

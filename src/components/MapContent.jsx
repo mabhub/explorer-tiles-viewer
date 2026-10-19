@@ -5,6 +5,7 @@ import {
   activityColors,
   activityThresholds,
   ageColors,
+  compareColors,
   countColors,
   currentYear,
   sharedColors,
@@ -25,15 +26,28 @@ const unvisitedColor = ['case', hasTrack, ['to-color', ['feature-state', 'track'
 
 const outlineColor = '#00000044';
 
+// Compare mode: only the tiles of the compared person and of their squadrats
+const compareKind = ['coalesce', ['feature-state', 'compare'], ''];
+const compareColor = [
+  'match', compareKind,
+  'both', compareColors.both,
+  'statshunters', compareColors.statshunters,
+  'squadrats', compareColors.squadrats,
+  '#fff0',
+];
+
 // Colored tiles keep their outline. The grid of unvisited ones fades out under
 // zoom 10, where it is too dense to read, and can be hidden altogether.
-const getOutlineColor = showGrid => (showGrid
-  ? [
-    'interpolate', ['linear'], ['zoom'],
-    9, ['case', isUncolored, '#0000', outlineColor],
-    10, outlineColor,
-  ]
-  : ['case', isUncolored, '#0000', outlineColor]);
+const getOutlineColor = (showGrid, colorMode) => {
+  const uncolored = colorMode === 'compare' ? ['==', compareKind, ''] : isUncolored;
+  return showGrid
+    ? [
+      'interpolate', ['linear'], ['zoom'],
+      9, ['case', uncolored, '#0000', outlineColor],
+      10, outlineColor,
+    ]
+    : ['case', uncolored, '#0000', outlineColor];
+};
 
 const countColor = [
   'case',
@@ -85,6 +99,7 @@ const getOwnerColor = activePersonCount => [
 const getFillColor = (colorMode, countActivities, activePersonCount) => {
   if (colorMode === 'owner') { return getOwnerColor(activePersonCount); }
   if (colorMode === 'age') { return ageColor; }
+  if (colorMode === 'compare') { return compareColor; }
   return countActivities ? activityColor : countColor;
 };
 
@@ -111,7 +126,7 @@ const MapContent = ({
         type="fill"
         source-layer={gridFeature.sourceLayer}
         paint={{
-          'fill-outline-color': getOutlineColor(showGrid),
+          'fill-outline-color': getOutlineColor(showGrid, colorMode),
           'fill-color': getFillColor(colorMode, countActivities, activePersonCount),
           'fill-opacity': [
             'case',

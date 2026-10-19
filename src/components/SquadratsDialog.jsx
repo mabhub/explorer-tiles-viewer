@@ -49,6 +49,7 @@ const SquadratsDialog = ({ open, onClose, onAdd }) => {
       ]);
       onAdd({
         accountId,
+        accountName,
         name: getDefaultName(accountName, timestamp),
         timestamp,
         geojson,

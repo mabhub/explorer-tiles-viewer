@@ -40,6 +40,7 @@ import {
   activityColors,
   activityThresholds,
   ageColors,
+  compareColors,
   countColors,
   currentYear,
   getFirstShareByShare,
@@ -48,6 +49,7 @@ import {
   sharedColors,
 } from '../share-colors';
 import { formatExportDate, getSquadratinhosRings } from '../squadrats';
+import { compareTiles, getComparedEntry, getComparedPerson } from '../squadrats-compare';
 import { getTrackBounds, parseTrack } from '../tracks';
 
 const globalStyles = { 'html, body, #root': { height: '100%' } };
@@ -194,7 +196,15 @@ const colorModeTooltips = {
   activities: 'Colore chaque tuile selon le nombre d\'activités qui l\'ont traversée.',
   owner:      'Colore chaque tuile de la couleur de la personne qui l\'a visitée, en gris si elles sont plusieurs.',
   age:        'Colore chaque tuile selon l\'année de sa dernière activité, de la plus récente (vive) à la plus ancienne (pâle).',
+  compare:    'Compare les tuiles Statshunters d\'une personne à ses squadrats de squadrats.com : en commun, Statshunters seul ou squadrats seul.',
 };
+
+const compareLabels = {
+  both:         'Les deux',
+  statshunters: 'Statshunters seul',
+  squadrats:    'Squadrats seul',
+};
+const noTiles = {};
 
 // ToggleButtonGroup clones its children and reads their `value`: the tooltip
 // goes inside
@@ -217,7 +227,8 @@ const Home = () => {
     setSquadrats,
     areSquadratsLoaded,
   );
-  const [colorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
+  // Shown as chosen, except the compare mode without a squadrats entry to compare
+  const [storedColorMode, setColorMode] = useLocalStorageState('colorMode', { defaultValue: 'count' });
   // Variant of the count coloring mode: activities instead of people
   const [countActivities, setCountActivities] = useLocalStorageState('countActivities', { defaultValue: false });
   const [isPanelCollapsed, setIsPanelCollapsed] = useLocalStorageState('panelCollapsed', { defaultValue: false });
@@ -279,17 +290,23 @@ const Home = () => {
   const shareAccounts = useShareAccounts(shareIdList);
 
   // Several shares of the same person count as one owner
-  const { firstShareByShare, colorByShare, activePersonCount } = React.useMemo(
+  const {
+    personByShare,
+    firstShareByShare,
+    colorByShare,
+    activePersonCount,
+  } = React.useMemo(
     () => {
       const ids = Object.keys(shares);
-      const personByShare = getPersonByShare(ids, shareQueries);
+      const personIds = getPersonByShare(ids, shareQueries);
       const activePeople = ids
-        .filter(id => isShareActive(shares[id]) && personByShare[id] !== undefined)
-        .map(id => personByShare[id]);
+        .filter(id => isShareActive(shares[id]) && personIds[id] !== undefined)
+        .map(id => personIds[id]);
 
-      const firstShares = getFirstShareByShare(ids, personByShare);
+      const firstShares = getFirstShareByShare(ids, personIds);
 
       return {
+        personByShare: personIds,
         firstShareByShare: firstShares,
         colorByShare: Object.fromEntries(
           ids.map(id => [id, getShareColor(shares, ids, firstShares[id])]),
@@ -307,6 +324,41 @@ const Home = () => {
   const getShareLabel = id => shares[id]?.alias || getAccountName(accountByShare[id]) || id;
   const labelByShare = Object.fromEntries(
     shareIdList.map(id => [id, getShareLabel(firstShareByShare[id])]),
+  );
+
+  // People of the active, loaded shares, in list order: { id, label, name }.
+  // Only they can be compared: the others have no tile on the map.
+  const people = [];
+  shareIdList.forEach(id => {
+    const personId = personByShare[id];
+    if (personId === undefined || !isShareActive(shares[id])
+      || people.some(person => person.id === personId)) { return; }
+    people.push({
+      id:    personId,
+      label: labelByShare[id],
+      name:  getAccountName(accountByShare[id]),
+    });
+  });
+
+  const comparedEntry = getComparedEntry(squadrats, people);
+  const comparedPerson = comparedEntry && getComparedPerson(comparedEntry, people);
+  const colorMode = storedColorMode === 'compare' && !comparedEntry ? 'count' : storedColorMode;
+
+  // Tiles of the person (their active shares) against the squadrats of the entry
+  const comparison = React.useMemo(
+    () => {
+      if (colorMode !== 'compare') { return undefined; }
+      const visitedKeys = new Set();
+      shareIdList.forEach((id, index) => {
+        if (personByShare[id] !== comparedPerson.id || !isShareActive(shares[id])) { return; }
+        shareQueries[index]?.data?.[1]?.forEach(({ tiles }) => {
+          tiles.forEach(({ x, y }) => visitedKeys.add(`14/${x}/${y}`));
+        });
+      });
+      return compareTiles(visitedKeys, comparedEntry.squadratTiles);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [colorMode, comparedPerson?.id, comparedEntry?.squadratTiles, shares, shareQueries],
   );
 
   const handleColorModeChange = React.useCallback(
@@ -362,6 +414,7 @@ const Home = () => {
   // link may be older than its latest export.
   const handleSquadratsAdd = ({
     accountId,
+    accountName,
     name,
     timestamp,
     geojson,
@@ -372,6 +425,7 @@ const Home = () => {
       : {
         id: crypto.randomUUID(),
         accountId,
+        accountName,
         name,
         color: pickShareColor(getUsedColors(tracks, squadrats)),
         disabled: false,
@@ -387,6 +441,12 @@ const Home = () => {
   };
 
   const handleSquadratsChange = (id, changes) => setSquadrats(updateItem(id, changes));
+
+  // Choosing whom to compare an entry with shows the comparison
+  const handleSquadratsCompare = (id, personId) => {
+    handleSquadratsChange(id, { personId });
+    setColorMode('compare');
+  };
 
   // Squadrats exports as listed in the panel, for the map context menu
   const squadratsItems = squadrats.map(({
@@ -524,6 +584,7 @@ const Home = () => {
           tracks={tracks}
           squadrats={squadrats}
           colorMode={colorMode}
+          compareKindByTile={comparison?.kindByTile ?? noTiles}
           countActivities={countActivities}
           onCountActivitiesToggle={() => setCountActivities(previous => !previous)}
           colorByShare={colorByShare}
@@ -592,6 +653,9 @@ const Home = () => {
                 </ColorModeButton>
                 <ColorModeButton value="owner" tooltip={colorModeTooltips.owner}>Compte</ColorModeButton>
                 <ColorModeButton value="age" tooltip={colorModeTooltips.age}>Âge</ColorModeButton>
+                {comparedEntry && (
+                  <ColorModeButton value="compare" tooltip={colorModeTooltips.compare}>Écarts</ColorModeButton>
+                )}
               </ToggleButtonGroup>
               <IconButton
                 size="small"
@@ -771,6 +835,22 @@ const Home = () => {
               </Stack>
             )}
 
+            {comparison && (
+              <Stack direction="row" alignItems="center" flexWrap="wrap" sx={{ mb: 1, pl: 1, columnGap: 1.5 }}>
+                <small>
+                  {comparedEntry.name === comparedPerson.label
+                    ? comparedPerson.label
+                    : `${comparedPerson.label} / ${comparedEntry.name}`}
+                </small>
+                {Object.entries(compareLabels).map(([kind, label]) => (
+                  <Stack key={kind} direction="row" alignItems="center" spacing={0.5}>
+                    <Box component="span" sx={{ ...swatchSx, bgcolor: compareColors[kind] }} />
+                    <small>{`${label} ${comparison.counts[kind].toLocaleString('fr-FR')}`}</small>
+                  </Stack>
+                ))}
+              </Stack>
+            )}
+
             {colorMode === 'owner' && activePersonCount > 1 && (
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1, pl: 1 }}>
                 <small>Partagé par</small>
@@ -823,6 +903,12 @@ const Home = () => {
             onFit={() => handleSquadratsFit(squadratsMenu.id)}
             onRefresh={refreshSquadrats}
             onLiveToggle={handleSquadratsLiveToggle}
+            people={people}
+            comparedPersonId={squadratsMenu && getComparedPerson(
+              squadrats.find(entry => entry.id === squadratsMenu.id) ?? {},
+              people,
+            )?.id}
+            onCompare={handleSquadratsCompare}
             onRename={() => {
               const { id, name } = squadrats.find(entry => entry.id === squadratsMenu.id);
               openRenameDialog('Renommer les squadrats', name, newName => handleSquadratsChange(id, { name: newName }));

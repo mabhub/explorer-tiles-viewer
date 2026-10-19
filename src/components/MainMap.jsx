@@ -31,10 +31,34 @@ const interactiveLayerIds = ['tiles'];
 const noMaxAreas = { square: false, line: false, column: false };
 const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxColumn };
 
+// Sets the feature state `name` of the grid tiles listed in `valueById` and
+// removes it from the tiles painted before and no longer listed. Painted
+// again when the grid source is replaced (`gridVersion`).
+const useGridState = (mapRef, gridVersion, valueById, name) => {
+  const painted = React.useRef({});
+  React.useEffect(
+    () => {
+      if (!gridVersion) { return; }
+      const map = mapRef.current;
+
+      Object.keys(painted.current).forEach(id => {
+        if (!valueById[id]) { map.removeFeatureState({ ...gridFeature, id }, name); }
+      });
+      Object.entries(valueById).forEach(([id, value]) => {
+        map.setFeatureState({ ...gridFeature, id }, { [name]: value });
+      });
+
+      painted.current = valueById;
+    },
+    [mapRef, gridVersion, valueById, name],
+  );
+};
+
 const MainMap = ({
   tracks,
   squadrats,
   colorMode,
+  compareKindByTile,
   countActivities,
   onCountActivitiesToggle,
   colorByShare,
@@ -206,25 +230,9 @@ const MainMap = ({
 
   // Painted apart from the visited tiles: a tile keeps its track color
   // underneath, shown once no active share visits it
-  const paintedTrackTiles = React.useRef({});
-  React.useEffect(
-    () => {
-      if (!gridVersion) { return; }
-      const map = mapRef.current;
-
-      Object.keys(paintedTrackTiles.current).forEach(id => {
-        if (!trackColorByTile[id]) {
-          map.removeFeatureState({ ...gridFeature, id }, 'track');
-        }
-      });
-      Object.entries(trackColorByTile).forEach(([id, track]) => {
-        map.setFeatureState({ ...gridFeature, id }, { track });
-      });
-
-      paintedTrackTiles.current = trackColorByTile;
-    },
-    [trackColorByTile, gridVersion],
-  );
+  useGridState(mapRef, gridVersion, trackColorByTile, 'track');
+  // Compare mode: kind of each tile known to the person or their squadrats
+  useGridState(mapRef, gridVersion, compareKindByTile, 'compare');
 
   // A new grid source has lost the highlight of the tile whose popup is open
   React.useEffect(
