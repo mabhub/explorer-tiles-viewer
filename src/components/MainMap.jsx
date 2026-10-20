@@ -1,8 +1,10 @@
 import React from 'react';
 
-import Map, { Popup } from 'react-map-gl/maplibre';
+import Map, { Popup } from '@vis.gl/react-maplibre';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
+// eslint-disable-next-line import/no-unresolved -- Vite query suffix
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import useLocalStorageState from 'use-local-storage-state';
 
 import useActivities from '../hooks/use-activities';
@@ -607,6 +609,7 @@ const MainMap = ({
     <Map
       // Reached from outside the map through useMap()
       id="main"
+      workerUrl={workerUrl}
       initialViewState={initialViewState}
       style={mapStyle}
       mapStyle={basemap.style}

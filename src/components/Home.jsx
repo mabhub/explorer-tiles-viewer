@@ -21,7 +21,7 @@ import {
   People,
   Timeline,
 } from '@mui/icons-material';
-import { useMap } from 'react-map-gl/maplibre';
+import { useMap } from '@vis.gl/react-maplibre';
 import useLocalStorageState from 'use-local-storage-state';
 
 import LoadingStatus from './LoadingStatus';

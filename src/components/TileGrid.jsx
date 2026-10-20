@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layer, Source, useMap } from 'react-map-gl/maplibre';
+import { Layer, Source, useMap } from '@vis.gl/react-maplibre';
 
 import {
   lat2tile,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layer, Source } from 'react-map-gl/maplibre';
+import { Layer, Source } from '@vis.gl/react-maplibre';
 
 import {
   activityColors,
