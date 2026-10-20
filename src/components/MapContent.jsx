@@ -15,14 +15,17 @@ import { getTrackGeojson } from '../tracks';
 import {
   getActivityLinesLayerId,
   getLiveTimestamp,
+  highlightedLinesArrowsLayerId,
   highlightedLinesCasingLayerId,
   highlightedLinesLayerId,
   getSquadratsLayerId,
+  getTrackArrowsLayerId,
   getTrackLayerId,
   maxAreasLayerId,
   tilesLayerId,
 } from '../layer-order';
 import SquadratinhosGrid from './SquadratinhosGrid';
+import { directionArrowsLayout } from '../direction-arrows';
 
 export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
 
@@ -46,6 +49,15 @@ const getActivityLinesPaint = color => ({
 // they stand out of a bundle of lines of the same color
 const highlightedLinesCasingPaint = { 'line-color': '#fff', 'line-width': 8 };
 const highlightedLinesPaint = { 'line-color': ['get', 'color'], 'line-width': 4 };
+// Edged in white, as the line: on its own color, the arrow would not show.
+// The halo counts in pixels of the image, twice as fine as the screen.
+const highlightedLinesArrowsPaint = {
+  'icon-color':      ['get', 'color'],
+  'icon-halo-color': '#fff',
+  'icon-halo-width': 3,
+};
+const highlightedLinesArrowsLayout = { ...directionArrowsLayout, 'icon-size': 1.1 };
+const trackArrowsLayout = { ...directionArrowsLayout, 'icon-size': 1.5 };
 
 // Compare mode: only the tiles of the compared person and of their squadrats
 const compareKind = ['coalesce', ['feature-state', 'compare'], ''];
@@ -135,6 +147,7 @@ const MapContent = ({
   maxAreas,
   showGrid,
   showSquadratinhosGrid,
+  showDirectionArrows,
   tracks = [],
   squadrats = [],
   activityLines = [],
@@ -224,6 +237,15 @@ const MapContent = ({
         layout={activityLinesLayout}
         paint={highlightedLinesPaint}
       />
+      {showDirectionArrows && (
+        <Layer
+          id={highlightedLinesArrowsLayerId}
+          type="symbol"
+          beforeId={labelsLayer}
+          layout={highlightedLinesArrowsLayout}
+          paint={highlightedLinesArrowsPaint}
+        />
+      )}
     </Source>
 
     {tracks.filter(({ disabled }) => !disabled).reverse().map(({ id: trackId, color, lines }) => {
@@ -231,6 +253,15 @@ const MapContent = ({
       return (
         <Source key={id} id={id} type="geojson" data={getTrackGeojson(lines)}>
           <Layer id={id} type="line" beforeId={labelsLayer} paint={{ 'line-color': color, 'line-width': 3 }} />
+          {showDirectionArrows && (
+            <Layer
+              id={getTrackArrowsLayerId(trackId)}
+              type="symbol"
+              beforeId={labelsLayer}
+              layout={trackArrowsLayout}
+              paint={{ 'icon-color': color }}
+            />
+          )}
         </Source>
       );
     })}

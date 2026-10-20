@@ -21,6 +21,7 @@ import {
 } from '../max-areas';
 import { defaultBasemap, getBasemap } from '../basemaps';
 import { getTrackTiles } from '../tracks';
+import { addDirectionArrowImage } from '../direction-arrows';
 import { getLineDistance } from '../activity-lines';
 import {
   applyLayerOrder,
@@ -99,6 +100,8 @@ const MainMap = ({
   const [maxAreas, setMaxAreas] = useLocalStorageState('maxAreas', { defaultValue: noMaxAreas });
   const [showGrid, setShowGrid] = useLocalStorageState('showGrid', { defaultValue: true });
   const [showSquadratinhosGrid, setShowSquadratinhosGrid] = useLocalStorageState('squadratinhosGrid', { defaultValue: false });
+  // Key named when only the tracks had arrows
+  const [showDirectionArrows, setShowDirectionArrows] = useLocalStorageState('trackArrows', { defaultValue: true });
   const [activeTile, setActiveTile] = React.useState();
   // Point of the click that opened the tile popup, which points at it
   const [activeTileLngLat, setActiveTileLngLat] = React.useState();
@@ -347,7 +350,10 @@ const MainMap = ({
   );
   // Reported the frame after any change of the style, layers added included
   const handleStyleData = React.useCallback(
-    ({ target: map }) => applyLayerOrder(map, layerOrderRef.current, labelsLayerRef.current),
+    ({ target: map }) => {
+      addDirectionArrowImage(map);
+      applyLayerOrder(map, layerOrderRef.current, labelsLayerRef.current);
+    },
     [],
   );
 
@@ -551,6 +557,7 @@ const MainMap = ({
         maxAreas={maxAreaFeatures}
         showGrid={showGrid}
         showSquadratinhosGrid={showSquadratinhosGrid}
+        showDirectionArrows={showDirectionArrows}
       />
       {activeTileData && (
         <Popup
@@ -603,6 +610,8 @@ const MainMap = ({
         onGridToggle={() => setShowGrid(previous => !previous)}
         showSquadratinhosGrid={showSquadratinhosGrid}
         onSquadratinhosGridToggle={() => setShowSquadratinhosGrid(previous => !previous)}
+        showDirectionArrows={showDirectionArrows}
+        onDirectionArrowsToggle={() => setShowDirectionArrows(previous => !previous)}
         countActivities={countActivities}
         onCountActivitiesToggle={onCountActivitiesToggle}
         canCountActivities={colorMode === 'count'}

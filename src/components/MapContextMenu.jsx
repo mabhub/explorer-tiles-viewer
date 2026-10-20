@@ -81,6 +81,8 @@ const MapContextMenu = ({
   onGridToggle,
   showSquadratinhosGrid,
   onSquadratinhosGridToggle,
+  showDirectionArrows,
+  onDirectionArrowsToggle,
   countActivities,
   onCountActivitiesToggle,
   canCountActivities,
@@ -257,6 +259,13 @@ const MapContextMenu = ({
           onClick={onSquadratinhosGridToggle}
         >
           Grille squadratinhos
+        </CheckItem>
+        <CheckItem
+          checked={showDirectionArrows}
+          secondary="Traces et activités survolées"
+          onClick={onDirectionArrowsToggle}
+        >
+          Sens de parcours <span aria-hidden>▶</span>
         </CheckItem>
         <Divider />
         {Object.entries(maxAreaLabels).map(([kind, label]) => (
