@@ -439,6 +439,21 @@ const MainMap = ({
     [activeTile],
   );
 
+  // Escape closes the popup. A menu or a dialog open over it handles the key
+  // and stops it first: the popup closes on the next press
+  const hasPopup = Boolean(activeTile || activeLines);
+  React.useEffect(
+    () => {
+      if (!hasPopup) { return undefined; }
+      const handleKeyDown = ({ key }) => {
+        if (key === 'Escape') { showTile(mapRef.current.getMap(), null); }
+      };
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    },
+    [hasPopup, showTile],
+  );
+
   const handleContextMenu = React.useCallback(
     ({ originalEvent, point, lngLat, target: map }) => {
       originalEvent.preventDefault();
