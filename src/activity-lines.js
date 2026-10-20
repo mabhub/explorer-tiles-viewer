@@ -18,9 +18,58 @@ const readValue = (encoded, start) => {
   return [result & 1 ? ~(result >> 1) : result >> 1, index];
 };
 
-// [[longitude, latitude], …], as GeoJSON
-export const decodePolyline = encoded => {
-  const points = [];
+// Douglas-Peucker on the points (xs[i] * scaleX, ys[i]): kept[i] is 1 for each
+// point kept, none of the others being farther than `tolerance` from the line
+const simplify = (xs, ys, scaleX, tolerance) => {
+  const { length } = xs;
+  const tolerance2 = tolerance * tolerance;
+  const kept = new Uint8Array(length);
+  kept[0] = 1;
+  kept[length - 1] = 1;
+
+  // Spans [first, last] still to simplify, as flat pairs: no recursion on long lines
+  const spans = [0, length - 1];
+  while (spans.length) {
+    const last = spans.pop();
+    const first = spans.pop();
+    const x0 = xs[first] * scaleX;
+    const y0 = ys[first];
+    const dx = xs[last] * scaleX - x0;
+    const dy = ys[last] - y0;
+    const length2 = dx * dx + dy * dy;
+    let farthest = -1;
+    let farthest2 = tolerance2;
+    for (let index = first + 1; index < last; index += 1) {
+      const px = xs[index] * scaleX - x0;
+      const py = ys[index] - y0;
+      let t = length2 ? (px * dx + py * dy) / length2 : 0;
+      if (t < 0) { t = 0; } else if (t > 1) { t = 1; }
+      const ex = t * dx - px;
+      const ey = t * dy - py;
+      const distance2 = ex * ex + ey * ey;
+      if (distance2 > farthest2) {
+        farthest = index;
+        farthest2 = distance2;
+      }
+    }
+    if (farthest >= 0) {
+      kept[farthest] = 1;
+      spans.push(first, farthest, farthest, last);
+    }
+  }
+  return kept;
+};
+
+const metersPerDegree = 111320;
+
+// [[longitude, latitude], …], as GeoJSON. With a `tolerance` (meters), the
+// line is simplified: it moves by that much at most. Distances are taken on a
+// plane around the first point, an activity spanning a few dozen kilometers.
+// Points are first decoded as integers (1e-5 degrees): only the kept ones
+// become arrays.
+export const decodePolyline = (encoded, tolerance = 0) => {
+  const lats = [];
+  const lngs = [];
   let lat = 0;
   let lng = 0;
   let index = 0;
@@ -30,8 +79,20 @@ export const decodePolyline = encoded => {
     lat += dLat;
     lng += dLng;
     index = end;
-    points.push([lng / 1e5, lat / 1e5]);
+    lats.push(lat);
+    lngs.push(lng);
   }
+
+  const kept = tolerance && lats.length > 2 && simplify(
+    lngs,
+    lats,
+    Math.cos((lats[0] / 1e5) * (Math.PI / 180)),
+    (tolerance * 1e5) / metersPerDegree,
+  );
+  const points = [];
+  lats.forEach((latitude, point) => {
+    if (!kept || kept[point]) { points.push([lngs[point] / 1e5, latitude / 1e5]); }
+  });
   return points;
 };
 
