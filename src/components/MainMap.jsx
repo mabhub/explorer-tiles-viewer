@@ -39,28 +39,43 @@ const lineQueryTolerance = 10;
 const noMaxAreas = { square: false, line: false, column: false };
 const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxColumn };
 
-// Sets the feature state `name` of the grid tiles listed in `valueById` and
-// removes it from the tiles painted before and no longer listed. Painted
-// again when the grid source is replaced (`gridVersion`).
-const useGridState = (mapRef, gridVersion, valueById, name) => {
-  const painted = React.useRef({});
+// Feature states are kept by the source and applied to grid tiles as they
+// load: they are set here from `statesById` ({ [tileId]: { name: value } }),
+// tiles no longer listed losing theirs. Each loading or refresh of a share
+// aggregates the tiles again, mostly with the same states: only those that
+// change are set. A new grid source (`gridVersion`, after a basemap change
+// replaced the whole style) gets them all.
+const useGridStates = (mapRef, gridVersion, statesById) => {
+  const painted = React.useRef({ version: 0, statesById: {} });
   React.useEffect(
     () => {
       if (!gridVersion) { return; }
       const map = mapRef.current;
+      const previousById = painted.current.version === gridVersion
+        ? painted.current.statesById
+        : {};
 
-      Object.keys(painted.current).forEach(id => {
-        if (!valueById[id]) { map.removeFeatureState({ ...gridFeature, id }, name); }
+      Object.entries(statesById).forEach(([id, states]) => {
+        const previous = previousById[id];
+        if (!previous || Object.keys(states).some(name => states[name] !== previous[name])) {
+          map.setFeatureState({ ...gridFeature, id }, states);
+        }
       });
-      Object.entries(valueById).forEach(([id, value]) => {
-        map.setFeatureState({ ...gridFeature, id }, { [name]: value });
+      // One by one: the tile keeps the states set by the other calls
+      Object.entries(previousById).forEach(([id, states]) => {
+        if (statesById[id]) { return; }
+        Object.keys(states).forEach(name => map.removeFeatureState({ ...gridFeature, id }, name));
       });
 
-      painted.current = valueById;
+      painted.current = { version: gridVersion, statesById };
     },
-    [mapRef, gridVersion, valueById, name],
+    [mapRef, gridVersion, statesById],
   );
 };
+
+// { [tileId]: value } as the states of the tiles: { [tileId]: { [name]: value } }
+const toGridStates = (valueById, name) => Object.fromEntries(Object.entries(valueById)
+  .map(([id, value]) => [id, { [name]: value }]));
 
 const MainMap = ({
   tracks,
@@ -287,49 +302,33 @@ const MainMap = ({
   // the whole style, feature states included
   const [gridVersion, setGridVersion] = React.useState(0);
   const gridSourceRef = React.useRef();
-  const paintedTiles = React.useRef({});
 
-  // Feature states are kept by the source and applied to grid tiles as they
-  // load, so they only need updating when the aggregated data changes.
-  React.useEffect(
-    () => {
-      if (!gridVersion) { return; }
-      const map = mapRef.current;
-
-      Object.keys(paintedTiles.current).forEach(id => {
-        if (!allTiles[id]) {
-          map.removeFeatureState({ ...gridFeature, id }, 'count');
-          map.removeFeatureState({ ...gridFeature, id }, 'color');
-          map.removeFeatureState({ ...gridFeature, id }, 'year');
-          map.removeFeatureState({ ...gridFeature, id }, 'activities');
-        }
-      });
-      Object.entries(allTiles).forEach(([id, {
-        userCount,
-        shares: owners,
-        latestDate,
-        activityKeys,
-      }]) => {
-        map.setFeatureState({ ...gridFeature, id }, {
-          count: userCount,
-          activities: activityKeys.size,
-          // Color of the only owning person (all their shares share it), none
-          // when several people own the tile
-          color: userCount === 1 ? colorByShare[owners[0]] : null,
-          year: latestDate ? Number(latestDate.slice(0, 4)) : null,
-        });
-      });
-
-      paintedTiles.current = allTiles;
-    },
-    [allTiles, gridVersion, colorByShare],
+  const visitedStates = React.useMemo(
+    () => Object.fromEntries(Object.entries(allTiles).map(([id, {
+      userCount,
+      shares: owners,
+      latestDate,
+      activityKeys,
+    }]) => [id, {
+      count: userCount,
+      activities: activityKeys.size,
+      // Color of the only owning person (all their shares share it), none
+      // when several people own the tile
+      color: userCount === 1 ? colorByShare[owners[0]] : null,
+      year: latestDate ? Number(latestDate.slice(0, 4)) : null,
+    }])),
+    [allTiles, colorByShare],
   );
+  useGridStates(mapRef, gridVersion, visitedStates);
 
   // Painted apart from the visited tiles: a tile keeps its track color
   // underneath, shown once no active share visits it
-  useGridState(mapRef, gridVersion, trackColorByTile, 'track');
-  // Compare mode: kind of each tile known to the person or their squadrats
-  useGridState(mapRef, gridVersion, compareKindByTile, 'compare');
+  const trackStates = React.useMemo(() => toGridStates(trackColorByTile, 'track'), [trackColorByTile]);
+  useGridStates(mapRef, gridVersion, trackStates);
+  // Compare mode: kind of each tile known to the person or their squadrats,
+  // computed again at each page loaded
+  const compareStates = React.useMemo(() => toGridStates(compareKindByTile, 'compare'), [compareKindByTile]);
+  useGridStates(mapRef, gridVersion, compareStates);
 
   // A new grid source has lost the highlight of the tile whose popup is open
   React.useEffect(
