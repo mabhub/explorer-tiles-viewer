@@ -10,7 +10,6 @@ import useLocalStorageState from 'use-local-storage-state';
 import useActivities from '../hooks/use-activities';
 import useShares, { isShareActive } from '../hooks/use-shares';
 import MapContent, { gridFeature } from './MapContent';
-import { tile2lat, tile2long } from '../lib';
 import Cadastre from './Cadastre';
 import MapContextMenu from './MapContextMenu';
 import TilePopup from './TilePopup';
@@ -101,6 +100,8 @@ const MainMap = ({
   const [showGrid, setShowGrid] = useLocalStorageState('showGrid', { defaultValue: true });
   const [showSquadratinhosGrid, setShowSquadratinhosGrid] = useLocalStorageState('squadratinhosGrid', { defaultValue: false });
   const [activeTile, setActiveTile] = React.useState();
+  // Point of the click that opened the tile popup, which points at it
+  const [activeTileLngLat, setActiveTileLngLat] = React.useState();
   // Activity lines under the last click: { longitude, latitude, lines: [{ shareId, id }] }
   const [activeLines, setActiveLines] = React.useState();
   // Activity line under the pointer, highlighted: a click opens it alone
@@ -422,11 +423,12 @@ const MainMap = ({
     [activeTile],
   );
   const showTile = React.useCallback(
-    (map, feature) => {
+    (map, feature, lngLat) => {
       setActiveLines();
       activeTile && map.setFeatureState(activeTile, { clicked: false });
       feature && map.setFeatureState(feature, { clicked: true });
       setActiveTile(feature ?? null);
+      setActiveTileLngLat(lngLat);
     },
     [activeTile],
   );
@@ -456,7 +458,7 @@ const MainMap = ({
       if (lines.length) {
         showLines(map, lngLat, lines);
       } else {
-        showTile(map, feature);
+        showTile(map, feature, lngLat);
       }
     },
     [menuQuery, showLines, showTile],
@@ -491,7 +493,7 @@ const MainMap = ({
 
       // The open tile again, an unvisited tile or no tile at all: close the popup
       const isOpen = feature?.id === activeTile?.id;
-      showTile(map, isOpen || !feature?.state.count ? null : feature);
+      showTile(map, isOpen || !feature?.state.count ? null : feature, lngLat);
     },
     [activeTile, findLines, showLines, showTile],
   );
@@ -552,14 +554,13 @@ const MainMap = ({
       />
       {activeTileData && (
         <Popup
-          latitude={tile2lat(activeTile.id.split('/').at(2), 14)}
-          longitude={tile2long(activeTile.id.split('/').at(1), 14)}
+          latitude={activeTileLngLat.lat}
+          longitude={activeTileLngLat.lng}
           onClose={() => {
             mapRef.current.setFeatureState(activeTile, { clicked: false });
             setActiveTile();
           }}
           closeOnClick={false}
-          anchor="bottom-right"
           maxWidth="360px"
         >
           <TilePopup
