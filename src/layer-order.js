@@ -19,12 +19,15 @@ export const getSquadratsLayerId = entry => {
   return liveTimestamp ? `squadrats-${entry.id}-${liveTimestamp}` : `squadrats-${entry.id}`;
 };
 export const getActivityLinesLayerId = shareId => `activity-lines-${shareId}`;
+// Hovered or opened activity lines, drawn again over all the others
+export const highlightedLinesCasingLayerId = 'activity-lines-highlight-casing';
+export const highlightedLinesLayerId = 'activity-lines-highlight';
 export const getTrackLayerId = id => `track-${id}`;
 
 /**
  * Ids of the viewer layers, from bottom to top: tiles, squadrats, squadratinhos
- * grid, activity lines, tracks, max areas. Within a group, the first item of
- * the list is drawn on top.
+ * grid, activity lines, highlighted activity lines, tracks, max areas. Within
+ * a group, the first item of the list is drawn on top.
  * @param {object} layers
  * @param {object[]} layers.squadrats active entries, in list order
  * @param {boolean} layers.squadratinhosGrid
@@ -42,6 +45,8 @@ export const getLayerOrder = ({
   ...squadrats.map(getSquadratsLayerId).reverse(),
   ...(squadratinhosGrid ? [squadratinhosGridLayerId] : []),
   ...activityLines.map(({ id }) => getActivityLinesLayerId(id)).reverse(),
+  highlightedLinesCasingLayerId,
+  highlightedLinesLayerId,
   ...tracks.map(({ id }) => getTrackLayerId(id)).reverse(),
   maxAreasLayerId,
 ];

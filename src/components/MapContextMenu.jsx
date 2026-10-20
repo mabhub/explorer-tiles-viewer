@@ -17,6 +17,7 @@ import {
   Layers,
   Map as MapIcon,
   PersonAdd,
+  TravelExplore,
   Visibility,
 } from '@mui/icons-material';
 
@@ -69,6 +70,8 @@ const LayerItem = ({
 const MapContextMenu = ({
   position,
   onClose,
+  onQuery,
+  canQuery,
   basemapId,
   onBasemapChange,
   maxAreas,
@@ -142,6 +145,20 @@ const MapContextMenu = ({
         anchorReference="anchorPosition"
         anchorPosition={position && { top: position.y, left: position.x }}
       >
+        {onQuery && [
+          <MenuItem
+            key="query"
+            disabled={!canQuery}
+            onClick={() => {
+              close();
+              onQuery();
+            }}
+          >
+            <ListItemIcon><TravelExplore fontSize="small" /></ListItemIcon>
+            <ListItemText>Interroger les données ici</ListItemText>
+          </MenuItem>,
+          <Divider key="query-divider" />,
+        ]}
         <MenuItem
           onClick={() => {
             close();

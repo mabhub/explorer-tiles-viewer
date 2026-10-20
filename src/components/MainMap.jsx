@@ -22,6 +22,7 @@ import {
 } from '../max-areas';
 import { defaultBasemap, getBasemap } from '../basemaps';
 import { getTrackTiles } from '../tracks';
+import { getLineDistance } from '../activity-lines';
 import {
   applyLayerOrder,
   findLabelsLayer,
@@ -35,9 +36,10 @@ MapLibreGL.addProtocol('pmtiles', protocol.tile);
 const initialViewState = { longitude: 1.4, latitude: 43.6, zoom: 11 };
 const mapStyle = { width: '100%', minHeight: 100, height: '100%' };
 const interactiveLayerIds = [tilesLayerId];
-// Half side, in pixels, of the square searched for activity lines around a
-// click: they are thin
+// Distance, in pixels, under which the pointer is on an activity line: they
+// are thin. « Interroger les données ici » looks further.
 const lineClickTolerance = 5;
+const lineQueryTolerance = 10;
 const noMaxAreas = { square: false, line: false, column: false };
 const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxColumn };
 
@@ -101,6 +103,10 @@ const MainMap = ({
   const [activeTile, setActiveTile] = React.useState();
   // Activity lines under the last click: { longitude, latitude, lines: [{ shareId, id }] }
   const [activeLines, setActiveLines] = React.useState();
+  // Activity line under the pointer, highlighted: a click opens it alone
+  const [hoveredLine, setHoveredLine] = React.useState();
+  // What a right click on the map found under it, for « Interroger les données ici »
+  const [menuQuery, setMenuQuery] = React.useState();
   const [cadastre] = React.useState(false);
   const [shares] = useShares();
 
@@ -177,15 +183,31 @@ const MainMap = ({
       .filter(({ activity }) => activity),
     [activeLines, activityByShare],
   );
+  // Lines of the popup, then the hovered one, drawn again over all the others
+  const lineFeatures = React.useMemo(
+    () => Object.fromEntries(activityLines.map(({ id, color, geojson }) => [
+      id,
+      {
+        color,
+        features: Object.fromEntries(geojson.features.map(feature => [feature.id, feature])),
+      },
+    ])),
+    [activityLines],
+  );
   const highlightedLines = React.useMemo(
-    () => {
-      const ids = {};
-      activeLineActivities.forEach(({ shareId, activity }) => {
-        ids[shareId] = [...ids[shareId] ?? [], activity.id];
-      });
-      return ids;
-    },
-    [activeLineActivities],
+    () => ({
+      type:     'FeatureCollection',
+      features: [
+        ...activeLineActivities.map(({ shareId, activity }) => ({ shareId, id: activity.id })),
+        ...hoveredLine ? [hoveredLine] : [],
+      ]
+        .map(({ shareId, id }) => {
+          const feature = lineFeatures[shareId]?.features[id];
+          return feature && { ...feature, properties: { color: lineFeatures[shareId].color } };
+        })
+        .filter(Boolean),
+    }),
+    [activeLineActivities, hoveredLine, lineFeatures],
   );
 
   // Max square, line and column of each person (all their active shares
@@ -349,12 +371,108 @@ const MainMap = ({
     [setBasemapId],
   );
 
-  const handleContextMenu = React.useCallback(
-    ({ originalEvent }) => {
-      originalEvent.preventDefault();
-      onContextMenuPositionChange({ x: originalEvent.clientX, y: originalEvent.clientY });
+  // Drawn activity lines within `tolerance` pixels of `point`, nearest first
+  const findLines = React.useCallback(
+    (map, point, tolerance) => {
+      const shareByLayer = Object.fromEntries(activityLines
+        .map(({ id }) => [getActivityLinesLayerId(id), id]));
+      const layers = Object.keys(shareByLayer).filter(id => map.getLayer(id));
+      if (!layers.length) { return []; }
+
+      const box = [
+        [point.x - tolerance, point.y - tolerance],
+        [point.x + tolerance, point.y + tolerance],
+      ];
+      const project = coordinates => map.project(coordinates);
+      // Corners of the box on the map, which may be rotated or pitched
+      const corners = [box[0], [box[1][0], box[0][1]], box[1], [box[0][0], box[1][1]]]
+        .map(corner => map.unproject(corner));
+      const lngs = corners.map(({ lng }) => lng);
+      const lats = corners.map(({ lat }) => lat);
+      const bounds = [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)],
+      ];
+      // A line split over several map tiles is found once per tile. A plain
+      // object: Map is the map component in this module.
+      const nearest = {};
+      map.queryRenderedFeatures(box, { layers }).forEach(({ layer, id, geometry }) => {
+        const shareId = shareByLayer[layer.id];
+        if (!activityByShare[shareId]?.[id]) { return; }
+        const distance = getLineDistance(geometry, point, project, bounds);
+        const key = `${shareId}/${id}`;
+        if (distance <= tolerance && !(nearest[key]?.distance <= distance)) {
+          nearest[key] = { shareId, id, distance };
+        }
+      });
+      return Object.values(nearest).sort((a, b) => a.distance - b.distance);
     },
-    [onContextMenuPositionChange],
+    [activityLines, activityByShare],
+  );
+
+  // Open the popup of these lines, or of this tile (none: close both)
+  const showLines = React.useCallback(
+    (map, lngLat, lines) => {
+      if (activeTile) {
+        map.setFeatureState(activeTile, { clicked: false });
+        setActiveTile(null);
+      }
+      setActiveLines({ longitude: lngLat.lng, latitude: lngLat.lat, lines });
+    },
+    [activeTile],
+  );
+  const showTile = React.useCallback(
+    (map, feature) => {
+      setActiveLines();
+      activeTile && map.setFeatureState(activeTile, { clicked: false });
+      feature && map.setFeatureState(feature, { clicked: true });
+      setActiveTile(feature ?? null);
+    },
+    [activeTile],
+  );
+
+  const handleContextMenu = React.useCallback(
+    ({ originalEvent, point, lngLat, target: map }) => {
+      originalEvent.preventDefault();
+      const position = { x: originalEvent.clientX, y: originalEvent.clientY };
+      const [feature] = map.queryRenderedFeatures(point, { layers: [tilesLayerId] });
+      setMenuQuery({
+        position,
+        lngLat,
+        lines: findLines(map, point, lineQueryTolerance),
+        feature: feature?.state.count ? feature : null,
+      });
+      onContextMenuPositionChange(position);
+    },
+    [onContextMenuPositionChange, findLines],
+  );
+
+  // Offered only when the menu was opened by a right click on the map
+  const canQuery = Boolean(menuQuery) && menuQuery.position === contextMenuPosition;
+  const handleQuery = React.useCallback(
+    () => {
+      const map = mapRef.current.getMap();
+      const { lngLat, lines, feature } = menuQuery;
+      if (lines.length) {
+        showLines(map, lngLat, lines);
+      } else {
+        showTile(map, feature);
+      }
+    },
+    [menuQuery, showLines, showTile],
+  );
+
+  const handleMouseMove = React.useCallback(
+    ({ point, originalEvent, target: map }) => {
+      // Not while panning, nor over a popup
+      const line = originalEvent.buttons || originalEvent.target !== map.getCanvas()
+        ? undefined
+        : findLines(map, point, lineClickTolerance)[0];
+      setHoveredLine(previous => (
+        previous?.shareId === line?.shareId && previous?.id === line?.id ? previous : line
+      ));
+    },
+    [findLines],
   );
 
   const handleMapClick = React.useCallback(
@@ -364,47 +482,18 @@ const MainMap = ({
       features: [feature],
       target: map,
     }) => {
-      // Activity lines win over the tile underneath: near a line, its activities
-      const shareByLayer = Object.fromEntries(activityLines
-        .map(({ id }) => [getActivityLinesLayerId(id), id]));
-      const layers = Object.keys(shareByLayer).filter(id => map.getLayer(id));
-      const box = [
-        [point.x - lineClickTolerance, point.y - lineClickTolerance],
-        [point.x + lineClickTolerance, point.y + lineClickTolerance],
-      ];
-      // A line split over several map tiles is found once per tile. A plain
-      // object: Map is the map component in this module.
-      const lines = Object.values(Object.fromEntries(
-        (layers.length ? map.queryRenderedFeatures(box, { layers }) : [])
-          .map(({ layer, id }) => ({ shareId: shareByLayer[layer.id], id }))
-          .filter(({ shareId, id }) => activityByShare[shareId]?.[id])
-          .map(line => [`${line.shareId}/${line.id}`, line]),
-      ));
-
-      if (lines.length) {
-        if (activeTile) {
-          map.setFeatureState(activeTile, { clicked: false });
-          setActiveTile(null);
-        }
-        setActiveLines({ longitude: lngLat.lng, latitude: lngLat.lat, lines });
+      // The activity line under the pointer wins over the tile underneath
+      const [line] = findLines(map, point, lineClickTolerance);
+      if (line) {
+        showLines(map, lngLat, [line]);
         return;
       }
-      setActiveLines();
 
       // The open tile again, an unvisited tile or no tile at all: close the popup
-      if (feature?.id === activeTile?.id || !feature?.state.count) {
-        if (activeTile) {
-          map.setFeatureState(activeTile, { clicked: false });
-          setActiveTile(null);
-        }
-        return;
-      }
-
-      activeTile && map.setFeatureState(activeTile, { clicked: false });
-      map.setFeatureState(feature, { clicked: true });
-      setActiveTile(feature);
+      const isOpen = feature?.id === activeTile?.id;
+      showTile(map, isOpen || !feature?.state.count ? null : feature);
     },
-    [activeTile, activityLines, activityByShare],
+    [activeTile, findLines, showLines, showTile],
   );
 
   const activeTileData = activeTile && allTiles[activeTile.id];
@@ -442,6 +531,9 @@ const MainMap = ({
       ref={mapRef}
       interactiveLayerIds={interactiveLayerIds}
       onClick={handleMapClick}
+      onMouseMove={handleMouseMove}
+      onMouseOut={() => setHoveredLine()}
+      cursor={hoveredLine ? 'pointer' : undefined}
       hash
     >
       <Cadastre show={cadastre} />
@@ -497,6 +589,8 @@ const MainMap = ({
       <MapContextMenu
         position={contextMenuPosition}
         onClose={() => onContextMenuPositionChange()}
+        onQuery={canQuery ? handleQuery : undefined}
+        canQuery={canQuery && Boolean(menuQuery.lines.length || menuQuery.feature)}
         basemapId={basemap.id}
         onBasemapChange={handleBasemapChange}
         maxAreas={maxAreas}

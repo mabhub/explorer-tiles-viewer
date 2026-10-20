@@ -15,6 +15,8 @@ import { getTrackGeojson } from '../tracks';
 import {
   getActivityLinesLayerId,
   getLiveTimestamp,
+  highlightedLinesCasingLayerId,
+  highlightedLinesLayerId,
   getSquadratsLayerId,
   getTrackLayerId,
   maxAreasLayerId,
@@ -35,17 +37,15 @@ const unvisitedColor = ['case', hasTrack, ['to-color', ['feature-state', 'track'
 const outlineColor = '#00000044';
 
 const activityLinesLayout = { 'line-join': 'round', 'line-cap': 'round' };
-const noHighlight = [];
-// Lines of the activities shown in the popup stand out. Named in the style,
-// not in a feature-state: a source created again (style or data) keeps them.
-const getActivityLinesPaint = (color, highlightedIds) => {
-  const isHighlighted = ['in', ['id'], ['literal', highlightedIds]];
-  return {
-    'line-color':   color,
-    'line-width':   ['case', isHighlighted, 4, 1.5],
-    'line-opacity': ['case', isHighlighted, 1, 0.7],
-  };
-};
+const getActivityLinesPaint = color => ({
+  'line-color':   color,
+  'line-width':   1.5,
+  'line-opacity': 0.7,
+});
+// Hovered or opened lines, in the color of their person with a white edge:
+// they stand out of a bundle of lines of the same color
+const highlightedLinesCasingPaint = { 'line-color': '#fff', 'line-width': 8 };
+const highlightedLinesPaint = { 'line-color': ['get', 'color'], 'line-width': 4 };
 
 // Compare mode: only the tiles of the compared person and of their squadrats
 const compareKind = ['coalesce', ['feature-state', 'compare'], ''];
@@ -138,7 +138,7 @@ const MapContent = ({
   tracks = [],
   squadrats = [],
   activityLines = [],
-  highlightedLines = {},
+  highlightedLines,
 }) => (
   <>
     <Source
@@ -203,11 +203,28 @@ const MapContent = ({
             type="line"
             beforeId={labelsLayer}
             layout={activityLinesLayout}
-            paint={getActivityLinesPaint(color, highlightedLines[shareId] ?? noHighlight)}
+            paint={getActivityLinesPaint(color)}
           />
         </Source>
       );
     })}
+
+    <Source id={highlightedLinesLayerId} type="geojson" data={highlightedLines}>
+      <Layer
+        id={highlightedLinesCasingLayerId}
+        type="line"
+        beforeId={labelsLayer}
+        layout={activityLinesLayout}
+        paint={highlightedLinesCasingPaint}
+      />
+      <Layer
+        id={highlightedLinesLayerId}
+        type="line"
+        beforeId={labelsLayer}
+        layout={activityLinesLayout}
+        paint={highlightedLinesPaint}
+      />
+    </Source>
 
     {tracks.filter(({ disabled }) => !disabled).reverse().map(({ id: trackId, color, lines }) => {
       const id = getTrackLayerId(trackId);
