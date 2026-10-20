@@ -21,13 +21,17 @@ import {
   getSquadratsLayerId,
   getTrackArrowsLayerId,
   getTrackLayerId,
+  gridLinesLayerId,
   maxAreasLayerId,
+  squadratinhosGridLayerId,
   tilesLayerId,
 } from '../layer-order';
-import SquadratinhosGrid from './SquadratinhosGrid';
+import TileGrid from './TileGrid';
 import { directionArrowsLayout } from '../direction-arrows';
 
-export const gridFeature = { source: 'grid', sourceLayer: 'explorer-tiles' };
+// Source of the tiles that are visited, crossed by a track or compared: one
+// square each, colored through their feature state
+export const gridFeature = { source: 'grid' };
 
 const isUnvisited = ['!', ['to-boolean', ['feature-state', 'count']]];
 const hasTrack = ['to-boolean', ['feature-state', 'track']];
@@ -38,6 +42,22 @@ const isUncolored = ['all', isUnvisited, ['!', hasTrack]];
 const unvisitedColor = ['case', hasTrack, ['to-color', ['feature-state', 'track']], '#fff0'];
 
 const outlineColor = '#00000044';
+
+// Grid of the explorer tiles (z14), faded in from zoom 9 to 10: too dense to
+// read below. Half opaque, as the outline of the tiles under their fill opacity.
+const gridLinesMinZoom = 9;
+const gridLinesPaint = {
+  'line-color':   outlineColor,
+  'line-width':   1,
+  'line-opacity': ['interpolate', ['linear'], ['zoom'], gridLinesMinZoom, 0, gridLinesMinZoom + 1, 0.5],
+};
+// Grid of the squadratinhos (z17 tiles)
+export const squadratinhosGridMinZoom = 13;
+const squadratinhosGridPaint = {
+  'line-color':   '#000',
+  'line-width':   1,
+  'line-opacity': ['interpolate', ['linear'], ['zoom'], squadratinhosGridMinZoom, 0.15, 15, 0.3],
+};
 
 const activityLinesLayout = { 'line-join': 'round', 'line-cap': 'round' };
 const getActivityLinesPaint = color => ({
@@ -69,17 +89,10 @@ const compareColor = [
   '#fff0',
 ];
 
-// Colored tiles keep their outline. The grid of unvisited ones fades out under
-// zoom 10, where it is too dense to read, and can be hidden altogether.
-const getOutlineColor = (showGrid, colorMode) => {
+// Colored tiles keep their outline, even with the grid hidden
+const getOutlineColor = colorMode => {
   const uncolored = colorMode === 'compare' ? ['==', compareKind, ''] : isUncolored;
-  return showGrid
-    ? [
-      'interpolate', ['linear'], ['zoom'],
-      9, ['case', uncolored, '#0000', outlineColor],
-      10, outlineColor,
-    ]
-    : ['case', uncolored, '#0000', outlineColor];
+  return ['case', uncolored, '#0000', outlineColor];
 };
 
 const countColor = [
@@ -141,6 +154,7 @@ const getFillColor = (colorMode, countActivities, activePersonCount) => {
 // to the layers added or moved later)
 const MapContent = ({
   labelsLayer,
+  tiles,
   colorMode,
   countActivities,
   activePersonCount,
@@ -154,18 +168,23 @@ const MapContent = ({
   highlightedLines,
 }) => (
   <>
-    <Source
-      id={gridFeature.source}
-      type="vector"
-      url={import.meta.env.VITE_GRID_VECTOR_TILES}
-      promoteId="id"
-    >
+    {showGrid && (
+      <TileGrid
+        id={gridLinesLayerId}
+        zoom={14}
+        minzoom={gridLinesMinZoom}
+        paint={gridLinesPaint}
+        beforeId={labelsLayer}
+      />
+    )}
+
+    {/* Squares are exact at zoom 14, overzoomed beyond */}
+    <Source id={gridFeature.source} type="geojson" data={tiles} promoteId="id" maxzoom={14}>
       <Layer
         id={tilesLayerId}
         type="fill"
-        source-layer={gridFeature.sourceLayer}
         paint={{
-          'fill-outline-color': getOutlineColor(showGrid, colorMode),
+          'fill-outline-color': getOutlineColor(colorMode),
           'fill-color': getFillColor(colorMode, countActivities, activePersonCount),
           'fill-opacity': [
             'case',
@@ -205,7 +224,15 @@ const MapContent = ({
       );
     })}
 
-    {showSquadratinhosGrid && <SquadratinhosGrid beforeId={labelsLayer} />}
+    {showSquadratinhosGrid && (
+      <TileGrid
+        id={squadratinhosGridLayerId}
+        zoom={17}
+        minzoom={squadratinhosGridMinZoom}
+        paint={squadratinhosGridPaint}
+        beforeId={labelsLayer}
+      />
+    )}
 
     {activityLines.slice().reverse().map(({ id: shareId, color, geojson }) => {
       const id = getActivityLinesLayerId(shareId);

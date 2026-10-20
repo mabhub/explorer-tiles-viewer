@@ -23,7 +23,7 @@ import {
 
 import basemaps from '../basemaps';
 import usePassThroughMenu from '../hooks/use-pass-through-menu';
-import { squadratinhosGridMinZoom } from './SquadratinhosGrid';
+import { squadratinhosGridMinZoom } from './MapContent';
 
 const maxAreaLabels = {
   square: 'Max square',

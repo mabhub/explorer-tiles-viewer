@@ -1,10 +1,8 @@
 import React from 'react';
 
 import Map, { Popup } from 'react-map-gl/maplibre';
-import * as pmtiles from 'pmtiles';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
-import MapLibreGL from 'maplibre-gl';
 import useLocalStorageState from 'use-local-storage-state';
 
 import useActivities from '../hooks/use-activities';
@@ -31,8 +29,6 @@ import {
   tilesLayerId,
 } from '../layer-order';
 
-const protocol = new pmtiles.Protocol();
-MapLibreGL.addProtocol('pmtiles', protocol.tile);
 const initialViewState = { longitude: 1.4, latitude: 43.6, zoom: 11 };
 const mapStyle = { width: '100%', minHeight: 100, height: '100%' };
 const interactiveLayerIds = [tilesLayerId];
@@ -261,9 +257,36 @@ const MainMap = ({
     [tracks],
   );
 
+  // One square per tile to color: visited, crossed by a track or compared.
+  // Built again only when that list changes, not when a color does nor when
+  // the shares are reordered (sorted ids).
+  const gridTileIds = React.useMemo(
+    () => [...new Set([
+      ...Object.keys(allTiles),
+      ...Object.keys(trackColorByTile),
+      ...Object.keys(compareKindByTile),
+    ])].sort().join(),
+    [allTiles, trackColorByTile, compareKindByTile],
+  );
+  const gridTiles = React.useMemo(
+    () => ({
+      type:     'FeatureCollection',
+      features: (gridTileIds ? gridTileIds.split(',') : []).map(id => {
+        const [, x, y] = id.split('/').map(Number);
+        return {
+          type:       'Feature',
+          properties: { id },
+          geometry:   toPolygon({ x, y, width: 1, height: 1 }),
+        };
+      }),
+    }),
+    [gridTileIds],
+  );
+
   // Bumped each time the grid source is (re)created: a basemap change replaces
   // the whole style, feature states included
   const [gridVersion, setGridVersion] = React.useState(0);
+  const gridSourceRef = React.useRef();
   const paintedTiles = React.useRef({});
 
   // Feature states are kept by the source and applied to grid tiles as they
@@ -329,11 +352,12 @@ const MainMap = ({
   const layerOrder = React.useMemo(
     () => getLayerOrder({
       squadrats: squadrats.filter(({ disabled }) => !disabled),
+      grid: showGrid,
       squadratinhosGrid: showSquadratinhosGrid,
       activityLines,
       tracks: tracks.filter(({ disabled }) => !disabled),
     }),
-    [squadrats, showSquadratinhosGrid, activityLines, tracks],
+    [showGrid, squadrats, showSquadratinhosGrid, activityLines, tracks],
   );
   const layerOrderRef = React.useRef(layerOrder);
   layerOrderRef.current = layerOrder;
@@ -359,9 +383,12 @@ const MainMap = ({
 
   const handleSourceData = React.useCallback(
     ({ sourceId, sourceDataType, target: map }) => {
-      // A replaced style also reports metadata for its removed grid source
+      // A replaced style also reports metadata for its removed grid source,
+      // and the source reports it again after each new data
+      const source = map.getSource(gridFeature.source);
       if (sourceId !== gridFeature.source || sourceDataType !== 'metadata'
-        || !map.getSource(gridFeature.source)) { return; }
+        || !source || source === gridSourceRef.current) { return; }
+      gridSourceRef.current = source;
       // The viewer layers may already be there: left out of the search
       setLabelsLayer(findLabelsLayer(map.getStyle().layers, new Set(layerOrderRef.current)));
       setGridVersion(version => version + 1);
@@ -562,6 +589,7 @@ const MainMap = ({
       <Cadastre show={cadastre} />
       <MapContent
         labelsLayer={labelsLayer}
+        tiles={gridTiles}
         tracks={tracks}
         squadrats={squadrats}
         activityLines={activityLines}

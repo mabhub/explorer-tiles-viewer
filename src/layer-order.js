@@ -3,6 +3,8 @@
 // twice, and the order below can name every layer.
 
 export const tilesLayerId = 'tiles';
+// Grid of the explorer tiles, under the colored ones
+export const gridLinesLayerId = 'grid-lines';
 export const maxAreasLayerId = 'max-areas';
 export const squadratinhosGridLayerId = 'squadratinhos-grid';
 // Timestamp of the squadrats.com tiles drawn by a live entry, none for a local copy
@@ -28,10 +30,11 @@ export const getTrackLayerId = id => `track-${id}`;
 export const getTrackArrowsLayerId = id => `track-arrows-${id}`;
 
 /**
- * Ids of the viewer layers, from bottom to top: tiles, squadrats, squadratinhos
+ * Ids of the viewer layers, from bottom to top: grid, tiles, squadrats, squadratinhos
  * grid, activity lines, highlighted activity lines (with their arrows), tracks
  * (each with its arrows), max areas. Within a group, the first item of the list is drawn on top.
  * @param {object} layers
+ * @param {boolean} layers.grid
  * @param {object[]} layers.squadrats active entries, in list order
  * @param {boolean} layers.squadratinhosGrid
  * @param {Array<{ id: string }>} layers.activityLines in list order
@@ -39,11 +42,13 @@ export const getTrackArrowsLayerId = id => `track-arrows-${id}`;
  * @returns {string[]}
  */
 export const getLayerOrder = ({
+  grid,
   squadrats,
   squadratinhosGrid,
   activityLines,
   tracks,
 }) => [
+  ...(grid ? [gridLinesLayerId] : []),
   tilesLayerId,
   ...squadrats.map(getSquadratsLayerId).reverse(),
   ...(squadratinhosGrid ? [squadratinhosGridLayerId] : []),
