@@ -43,6 +43,12 @@ const unvisitedColor = ['case', hasTrack, ['to-color', ['feature-state', 'track'
 
 const outlineColor = '#00000044';
 
+// Margin (px) of the internal tiles of the sources of squares. Squares lie on
+// the edges of those tiles: the default 128 px only duplicates them in the
+// neighbour tiles (about twice as fast to tile at low zoom). 0 would draw
+// half the outline along the tile edges.
+const squaresBuffer = 4;
+
 // Grid of the explorer tiles (z14), faded in from zoom 9 to 10: too dense to
 // read below. Half opaque, as the outline of the tiles under their fill opacity.
 const gridLinesMinZoom = 9;
@@ -179,7 +185,14 @@ const MapContent = ({
     )}
 
     {/* Squares are exact at zoom 14, overzoomed beyond */}
-    <Source id={gridFeature.source} type="geojson" data={tiles} promoteId="id" maxzoom={14}>
+    <Source
+      id={gridFeature.source}
+      type="geojson"
+      data={tiles}
+      promoteId="id"
+      maxzoom={14}
+      buffer={squaresBuffer}
+    >
       <Layer
         id={tilesLayerId}
         type="fill"
@@ -218,7 +231,7 @@ const MapContent = ({
         );
       }
       return (
-        <Source key={id} id={id} type="geojson" data={getSquadratinhos(geojson)}>
+        <Source key={id} id={id} type="geojson" data={getSquadratinhos(geojson)} buffer={squaresBuffer}>
           <Layer id={id} type="fill" beforeId={labelsLayer} paint={paint} />
         </Source>
       );
