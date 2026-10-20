@@ -36,6 +36,8 @@ const interactiveLayerIds = [tilesLayerId];
 // are thin. « Interroger les données ici » looks further.
 const lineClickTolerance = 5;
 const lineQueryTolerance = 10;
+// Minimum time (ms) between two searches of the line under the pointer
+const hoverInterval = 50;
 const noMaxAreas = { square: false, line: false, column: false };
 const maxAreaGetters = { square: getMaxSquare, line: getMaxLine, column: getMaxColumn };
 
@@ -511,7 +513,7 @@ const MainMap = ({
     [menuQuery, showLines, showTile],
   );
 
-  const handleMouseMove = React.useCallback(
+  const updateHoveredLine = React.useCallback(
     ({ point, originalEvent, target: map }) => {
       // Not while panning, nor over a popup
       const line = originalEvent.buttons || originalEvent.target !== map.getCanvas()
@@ -523,6 +525,41 @@ const MainMap = ({
     },
     [findLines],
   );
+
+  // Looking for the line under the pointer takes up to 15 ms over dense
+  // bundles, nearly a frame on a 120 Hz screen: done once per
+  // `hoverInterval` at most, the last position of the pointer included
+  const hoverThrottle = React.useRef({ timer: null, pending: null });
+  const handleMouseMove = React.useCallback(
+    event => {
+      const throttle = hoverThrottle.current;
+      if (throttle.timer) {
+        throttle.pending = event;
+        return;
+      }
+      const update = current => {
+        updateHoveredLine(current);
+        throttle.timer = setTimeout(() => {
+          const { pending } = throttle;
+          throttle.timer = null;
+          throttle.pending = null;
+          if (pending) { update(pending); }
+        }, hoverInterval);
+      };
+      update(event);
+    },
+    [updateHoveredLine],
+  );
+  // A position left pending would highlight a line again once out of the map
+  const handleMouseOut = React.useCallback(
+    () => {
+      clearTimeout(hoverThrottle.current.timer);
+      hoverThrottle.current = { timer: null, pending: null };
+      setHoveredLine();
+    },
+    [],
+  );
+  React.useEffect(() => () => clearTimeout(hoverThrottle.current.timer), []);
 
   const handleMapClick = React.useCallback(
     ({
@@ -581,7 +618,7 @@ const MainMap = ({
       interactiveLayerIds={interactiveLayerIds}
       onClick={handleMapClick}
       onMouseMove={handleMouseMove}
-      onMouseOut={() => setHoveredLine()}
+      onMouseOut={handleMouseOut}
       cursor={hoveredLine ? 'pointer' : undefined}
       hash
     >
